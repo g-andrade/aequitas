@@ -1,0 +1,16 @@
+{application, aequitas,
+ [{description, "An OTP application"},
+  {vsn, git},
+  {registered, []},
+  {mod, {aequitas_app, []}},
+  {applications,
+   [kernel,
+    stdlib
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {maintainers, ["Guilherme Andrade"]},
+  {licenses, ["MIT"]},
+  {links, [{"Github", "https://github.com/g-andrade/aequitas"}]}
+ ]}.
