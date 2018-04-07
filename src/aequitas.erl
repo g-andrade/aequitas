@@ -28,39 +28,110 @@
    [ask/1,
     ask/2,
     ask/3,
-    reconfigure/2
+    configure/2
    ]).
 
 -ignore_xref(
    [ask/1,
     ask/2,
     ask/3,
-    reconfigure/2
+    configure/2
    ]).
 
 %%-------------------------------------------------------------------
 %% API Function Definitions
 %%-------------------------------------------------------------------
 
--spec ask(atom())
-        -> {accepted | refused, #{ deviation => number() }} |
-           {error, {process_down, term()}}.
+%% @doc Like `:ask/2' but `Id' defaults to `self()'
+%%
+%% <ul>
+%% <li>`Group' must be an atom.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`{accepted, Metrics}' if work execution was granted</li>
+%% <li>`{refused, Metrics}' if work execution was denied</li>
+%% <li>`{error, term()}' otherwise</li>
+%% </ul>
+%% @see ask/2
+%% @see ask/3
+-spec ask(Group)
+        -> {accepted | refused, Metrics} |
+           {error, ErrorReason}
+    when Group :: atom(),
+         Metrics :: #{ deviation => number() },
+         ErrorReason :: term().
 ask(Group) ->
     ask(Group, self()).
 
--spec ask(atom(), term())
-        -> {accepted | refused, #{ deviation => number() }} |
-           {error, {process_down, term()}}.
+%% @doc Like `:ask/3' but with defaults options
+%%
+%% <ul>
+%% <li>`Group' must be an atom.</li>
+%% <li>`Id' must be a term.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`{accepted, Metrics}' if work execution was granted</li>
+%% <li>`{refused, Metrics}' if work execution was denied</li>
+%% <li>`{error, term()}' otherwise</li>
+%% </ul>
+%% @see ask/1
+%% @see ask/3
+-spec ask(Group, Id)
+        -> {accepted | refused, Metrics} |
+           {error, ErrorReason}
+    when Group :: atom(),
+         Id :: term(),
+         Metrics :: #{ deviation => number() },
+         ErrorReason :: term().
 ask(Group, Id) ->
     ask(Group, Id, []).
 
--spec ask(atom(), term(), [aequitas_group:ask_opt()])
-        -> {accepted | refused, #{ deviation => number() }} |
-           {error, {process_down, term()}}.
+%% @doc Request permission to perform work identified by `Id' within `Group'
+%%
+%% <ul>
+%% <li>`Group' must be an atom.</li>
+%% <li>`Id' must be a term.</li>
+%% <li>`Opts' must be a list of `aequitas_group:ask_opt()' values</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`{accepted, Metrics}' if work execution was granted</li>
+%% <li>`{refused, Metrics}' if work execution was denied</li>
+%% <li>`{error, term()}' otherwise</li>
+%% </ul>
+%% @see ask/2
+%% @see ask/3
+-spec ask(Group, Id, Opts)
+        -> {accepted | refused, Metrics} |
+           {error, ErrorReason}
+    when Group :: atom(),
+         Id :: term(),
+         Opts :: [aequitas_group:ask_opt()],
+         Metrics :: #{ deviation => number() },
+         ErrorReason :: term().
 ask(Group, Id, Opts) ->
     aequitas_group:ask(Group, Id, Opts).
 
--spec reconfigure(atom(), [aequitas_group:setting_opt()])
-        -> ok | {error, bad_settings}.
-reconfigure(Group, SettingOpts) ->
+%% @doc Tweak settings of work `Group'
+%%
+%% <ul>
+%% <li>`Group' must be an atom.</li>
+%% <li>`SettingOpts' must be a list of `aequitas_group:setting_opt()' values</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`ok' in case of success</li>
+%% <li>`{error, term()}' otherwise</li>
+%% </ul>
+-spec configure(Group, SettingOpts)
+        -> ok | {error, bad_settings}
+    when Group :: atom(),
+         SettingOpts :: [aequitas_group:setting_opt()].
+configure(Group, SettingOpts) ->
     aequitas_group:set_settings(Group, SettingOpts).
