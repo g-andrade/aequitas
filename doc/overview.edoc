@@ -74,7 +74,7 @@ in a rolling fashion, for accepted work events within the window.
 Based on these statistical measures, whenever there's a new request for work execution
 we calculate the present
 <a target="_parent" href="https://en.wikipedia.org/wiki/Standard_score">z-score</a> of
-the actor within the overall work performed. The z-score, or standard score, is
+the actor within the overall work performed. This z-score, or standard score, is
 the signed number of standard deviations above the mean.
 
 Assuming that work distribution among actors approximates the
@@ -98,7 +98,7 @@ to execute. It can be any number or `infinity'.
 
 Picking the web server example above, if we wanted to be stricter
 about upper quantile outliers, we could lower `max_zscore' to `1' - which
-would cause rejection of the top '~16%' of work share culprits.
+would cause rejection of the top `~16%' of work share culprits.
 
 <pre lang="erlang" class="erlang">
 <![CDATA[case aequitas:ask(http_requests, IPAddress, [{max_zscore, 1}]) of
@@ -114,8 +114,8 @@ end.]]>
 ==== Work Weight ====
 
 Work can be weighted by specifying the `weight' option when
-asking permission to execute. It must be a positive integer
-and the default value is '1'.
+asking permission to execute. It must be a positive integer;
+the default value is `1'.
 
 Picking the web server example above, if we were to weight our requests
 using their body size, it would become something like this:
@@ -158,7 +158,7 @@ by declaring the overriden settings, per group, in the following fashion:
 
 Proper app. configuration reloads that result in calls to
 the application's internal `:config_change/3' callback will trigger
-a reload of settings in each alive group process.
+a reload of settings in each of the relevant group processes.
 
 ==== Dynamic Configuration ====
 
