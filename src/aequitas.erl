@@ -50,19 +50,15 @@
 %%
 %% Returns:
 %% <ul>
-%% <li>`{accepted, Metrics}' if work execution was granted</li>
-%% <li>`{rejected, Metrics}' if work execution was denied</li>
-%% <li>`{error, term()}' otherwise</li>
+%% <li>`accepted' if work execution was granted</li>
+%% <li>`rejected' if work execution was denied</li>
 %% </ul>
 %% @see ask/1
 %% @see ask/3
 -spec ask(Group, Id)
-        -> {accepted | rejected, Metrics} |
-           {error, ErrorReason}
+        -> accepted | rejected
     when Group :: atom(),
-         Id :: term(),
-         Metrics :: #{ zscore => number() },
-         ErrorReason :: term().
+         Id :: term().
 ask(Group, Id) ->
     ask(Group, Id, []).
 
@@ -76,20 +72,16 @@ ask(Group, Id) ->
 %%
 %% Returns:
 %% <ul>
-%% <li>`{accepted, Metrics}' if work execution was granted</li>
-%% <li>`{rejected, Metrics}' if work execution was denied</li>
-%% <li>`{error, term()}' otherwise</li>
+%% <li>`accepted' if work execution was granted</li>
+%% <li>`rejected' if work execution was denied</li>
 %% </ul>
 %% @see ask/2
 %% @see ask/3
 -spec ask(Group, Id, Opts)
-        -> {accepted | rejected, Metrics} |
-           {error, ErrorReason}
+        -> accepted | rejected
     when Group :: atom(),
          Id :: term(),
-         Opts :: [aequitas_group:ask_opt()],
-         Metrics :: #{ zscore => number() },
-         ErrorReason :: term().
+         Opts :: [aequitas_group:ask_opt()].
 ask(Group, Id, Opts) ->
     aequitas_group:ask(Group, Id, Opts).
 

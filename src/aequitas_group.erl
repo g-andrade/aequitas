@@ -129,8 +129,7 @@ start_link(Group) ->
     proc_lib:start_link(?MODULE, init, [{self(), [Group]}]).
 
 -spec ask(atom(), term(), [ask_opt()])
-        -> {accepted | refused, #{ zscore => number() }} |
-           {error, {process_down, term()}}.
+        -> accepted | rejected.
 %% @private
 ask(Group, Id, Opts) ->
     Weight = proplists:get_value(weight, Opts, ?DEFAULT_EVENT_WEIGHT),
@@ -275,7 +274,7 @@ call(Group, Content) ->
           when Reason =:= normal; Reason =:= noproc ->
             call(Group, Content);
         {'DOWN', ServerMon, process, _Pid, Reason} ->
-            {error, {process_down, Reason}}
+            error({group_process_down, Reason})
     end.
 
 ensure_server(Group) ->
@@ -398,24 +397,19 @@ handle_ask(Id, Weight, MaxZScore, UnaffectedState) ->
     StateBeforeAccept = tentatively_make_room_before_accepting(UnaffectedState),
     StateAfterAccept = tentatively_accept(Id, Weight, StateBeforeAccept),
     ZScore = zscore(Id, StateAfterAccept),
-    Metrics = #{ zscore => ZScore },
     case ZScore < MaxZScore of
         true ->
-            {{accepted, Metrics}, StateAfterAccept};
+            {accepted, StateAfterAccept};
         _ ->
-            {{rejected, Metrics}, UnaffectedState}
+            {rejected, UnaffectedState}
     end.
 
-tentatively_make_room_before_accepting(State) ->
-    EventPeek = queue:peek(State#state.window),
-    Settings = State#state.settings,
-    tentatively_make_room_before_accepting(EventPeek, Settings, State).
-
-tentatively_make_room_before_accepting({value, Event}, Settings, State)
-  when Settings#settings.max_window_size =< State#state.window_size ->
+tentatively_make_room_before_accepting(State)
+  when State#state.window_size >= (State#state.settings)#settings.max_window_size ->
+    {value, Event} = queue:peek(State#state.window),
     UpdatedState = drop_event(Event, State),
     tentatively_make_room_before_accepting(UpdatedState);
-tentatively_make_room_before_accepting(_Peek, _Settings, State) ->
+tentatively_make_room_before_accepting(State) ->
     State.
 
 tentatively_accept(Id, Weight, State) ->
@@ -438,18 +432,6 @@ tentatively_accept(Id, Weight, State) ->
       work_shares = UpdatedWorkShares,
       work_stats = UpdatedWorkStats
      }.
-
-zscore(Id, State) ->
-    % Standard score / Z-score:
-    % https://en.wikipedia.org/wiki/Standard_score
-    WorkStats = State#state.work_stats,
-    case WorkStats#work_stats.stddev of
-        0.0 ->
-            0.0;
-        StdDev ->
-            Share = maps:get(Id, State#state.work_shares),
-            (Share - WorkStats#work_stats.mean) / StdDev
-    end.
 
 update_work_share(Id, ShareIncr, WorkShares) ->
     ShareLookup = maps:find(Id, WorkShares),
@@ -488,4 +470,16 @@ update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, WorkStats) ->
                mean = UpdatedMean,
                stddev = UpdatedStdDev
               }
+    end.
+
+zscore(Id, State) ->
+    % Standard score / Z-score:
+    % https://en.wikipedia.org/wiki/Standard_score
+    WorkStats = State#state.work_stats,
+    case WorkStats#work_stats.stddev of
+        0.0 ->
+            0.0;
+        StdDev ->
+            WorkShare = maps:get(Id, State#state.work_shares),
+            (WorkShare - WorkStats#work_stats.mean) / StdDev
     end.
