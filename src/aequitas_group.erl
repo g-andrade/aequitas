@@ -447,7 +447,7 @@ zscore(Id, State) ->
         0.0 ->
             0.0;
         StdDev ->
-            Share = maps:get(Id, State#state.work_shares, 0),
+            Share = maps:get(Id, State#state.work_shares),
             (Share - WorkStats#work_stats.mean) / StdDev
     end.
 
