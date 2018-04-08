@@ -6,6 +6,8 @@
 <a target="_parent" href="https://travis-ci.org/g-andrade/aequitas" alt="Build Status">
     <img src="https://travis-ci.org/g-andrade/aequitas.png?branch=master"/></a>
 
+/ˈae̯.kʷi.taːs/
+
 == aequitas - Fairness Regulator  ==
 
 `aequitas' is a library for Erlang/OTP and Elixir that allows you to fairly
