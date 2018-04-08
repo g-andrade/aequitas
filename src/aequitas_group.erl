@@ -31,6 +31,7 @@
 -export(
    [start_link/1,
     ask/3,
+    async_ask/3,
     set_settings/2,
     validate_settings/1,
     reload_settings/1
@@ -133,16 +134,28 @@
 start_link(Group) ->
     proc_lib:start_link(?MODULE, init, [{self(), [Group]}]).
 
--spec ask(atom(), term(), [ask_opt()])
-        -> accepted | rejected.
+-spec ask(atom() | pid(), term(), [ask_opt()]) -> accepted | rejected.
 %% @private
-ask(Group, Id, Opts) ->
-    Params = parse_ask_opts(Opts),
-    call(Group, {ask, Id, Params}).
+ask(Group, Id, Opts) when is_atom(Group) ->
+    Pid = ensure_server(Group),
+    ask(Pid, Id, Opts);
+ask(Pid, Id, Opts) when is_pid(Pid) ->
+    {Tag, Mon} = async_ask(Pid, Id, Opts),
+    wait_call_reply(Tag, Mon).
 
--spec set_settings(atom(), [setting_opt()]) -> ok | {error, term()}.
+-spec async_ask(atom() | pid(), term(), [ask_opt()]) -> {reference(), reference()}.
 %% @private
-set_settings(Group, SettingOpts) ->
+async_ask(Group, Id, Opts) when is_atom(Group) ->
+    Pid = ensure_server(Group),
+    async_ask(Pid, Id, Opts);
+async_ask(Pid, Id, Opts) when is_pid(Pid) ->
+    Params = parse_ask_opts(Opts),
+    send_call(Pid, {ask, Id, Params}).
+
+-spec set_settings(atom(), [setting_opt()])
+        -> ok | {error, {invalid_setting_opt | invalid_setting_opts, _}}.
+%% @private
+set_settings(Group, SettingOpts) when is_atom(Group) ->
     case validate_settings(SettingOpts) of
         ok ->
             aequitas_cfg:set({group, Group}, SettingOpts),
@@ -163,14 +176,10 @@ validate_settings(SettingOpts) ->
 
 -spec reload_settings(atom()) -> ok.
 %% @private
-reload_settings(Group) ->
-    Server = server_name(Group),
-    case whereis(Server) of
-        undefined -> ok;
-        ServerPid ->
-            ServerPid ! reload_settings,
-            ok
-    end.
+reload_settings(Group) when is_atom(Group) ->
+    Pid = ensure_server(Group),
+    send_cast(Pid, reload_settings),
+    ok.
 
 %%-------------------------------------------------------------------
 %% OTP Function Definitions
@@ -228,13 +237,25 @@ system_code_change(State, _Module, _OldVsn, _Extra) ->
 %% Internal Functions Definitions - Initialization and Requests
 %%-------------------------------------------------------------------
 
-server_name(Group) when is_atom(Group) ->
+ensure_server(Group) ->
+    Server = server_name(Group),
+    case whereis(Server) of
+        undefined ->
+            case aequitas_group_sup:start_child([Group]) of
+                {ok, Pid} ->
+                    Pid;
+                {error, already_started} ->
+                    whereis(Server)
+            end;
+        Pid ->
+            Pid
+    end.
+
+server_name(Group) ->
     list_to_atom(
       atom_to_list(?MODULE)
       ++ "."
-      ++ atom_to_list(Group));
-server_name(Group) ->
-    error({badarg, Group}).
+      ++ atom_to_list(Group)).
 
 load_settings(Group) ->
     SettingOpts = aequitas_cfg:get({group, Group}, []),
@@ -265,34 +286,23 @@ parse_settings_opts([InvalidOpt | _Next], _Acc) ->
 parse_settings_opts(InvalidOpts, _Acc) ->
     {error, {invalid_setting_opts, InvalidOpts}}.
 
-call(Group, Content) ->
-    {ok, ServerPid} = ensure_server(Group),
-    ServerMon = monitor(process, ServerPid),
-    CallRef = ServerMon, % reuse ref
-    ServerPid ! {call, {self(), CallRef}, Content},
-    receive
-        {reply, CallRef, Reply} ->
-            demonitor(ServerMon, [flush]),
-            Reply;
-        {'DOWN', ServerMon, process, _Pid, Reason}
-          when Reason =:= normal; Reason =:= noproc ->
-            call(Group, Content);
-        {'DOWN', ServerMon, process, _Pid, Reason} ->
-            error({group_process_down, Reason})
-    end.
+send_call(Pid, Call) ->
+    Mon = monitor(process, Pid),
+    Tag = Mon,
+    Pid ! {call, self(), Tag, Call},
+    {Tag, Mon}.
 
-ensure_server(Group) ->
-    Server = server_name(Group),
-    case whereis(Server) of
-        undefined ->
-            case aequitas_group_sup:start_child([Group]) of
-                {ok, Pid} ->
-                    {ok, Pid};
-                {error, already_started} ->
-                    ensure_server(Group)
-            end;
-        Pid ->
-            {ok, Pid}
+send_cast(Pid, Cast) ->
+    Pid ! {cast, Cast},
+    ok.
+
+wait_call_reply(Tag, Mon) ->
+    receive
+        {Tag, Reply} ->
+            demonitor(Mon, [flush]),
+            Reply;
+        {'DOWN', Mon, process, _Pid, Reason} ->
+            error({group_process_stopped, Reason})
     end.
 
 %%-------------------------------------------------------------------
@@ -374,19 +384,15 @@ handle_msg(Msg, Parent, Debug, State) ->
     UpdatedDebug = sys:handle_debug(Debug, fun ?MODULE:write_debug/3, ?MODULE, {in, Msg}),
     handle_nonsystem_msg(Msg, Parent, UpdatedDebug, State).
 
-handle_nonsystem_msg({call, From, Content}, Parent, Debug, State) ->
-    {FromPid, CallRef} = From,
-    {Reply, UpdatedState} = handle_call(Content, State),
-    FromPid ! {reply, CallRef, Reply},
+handle_nonsystem_msg({call, Pid, Tag, {ask, Id, Params}}, Parent, Debug, State) ->
+    {Reply, UpdatedState} = handle_ask(Id, Params, State),
+    Pid ! {Tag, Reply},
     loop(Parent, Debug, UpdatedState);
-handle_nonsystem_msg(reload_settings, Parent, Debug, State) ->
+handle_nonsystem_msg({cast, reload_settings}, Parent, Debug, State) ->
     UpdatedState = handle_settings_reload(State),
     loop(Parent, Debug, UpdatedState);
 handle_nonsystem_msg(Msg, _Parent, _Debug, _State) ->
     error({unexpected_msg, Msg}).
-
-handle_call({ask, Id, Params}, State) ->
-    handle_ask(Id, Params, State).
 
 handle_settings_reload(State) ->
     State#state{
