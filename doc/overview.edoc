@@ -38,24 +38,24 @@ end.]]>
 `aequitas' is not a rate limiter; it only intends on preventing gluttonous
 actors from taking over a system. But it can be combined with one.
 
-=== Event Tracking ===
+=== Work Tracking ===
 
 A group keeps a sliding window that tracks how many work units were attributed
-to each actor within the last `N' events; the maximum size of the event window,
-`N', is determined by constraints derived from from the group  settings:
+to each actor within the last `N' accepted requests; the maximum size of
+the sliding window, `N', is determined by constraints derived from from the group  settings:
 
 <ul>
-<li>`max_window_size': Enforces a ceiling on how many events we're allowed to track (defaults to 10000)</li>
-<li>`max_window_duration': Enforces a maximum age for events (defaults to 5000ms)</li>
+<li>`max_window_size': Enforces a ceiling on how many acceptances we're allowed to track (defaults to 10000)</li>
+<li>`max_window_duration': Enforces a maximum age for acceptances (defaults to 5000ms)</li>
 </ul>
 
-Whichever of these limits is reached first will trigger a drop of old events
+Whichever of these limits is reached first will trigger a drop of work events
 until the window is below both limits again.
 
 === Rationale ===
 
 Both the mean of and the standard deviation from work share are calculated,
-in a rolling fashion, for events within the window.
+in a rolling fashion, for accepted work events within the window.
 
 Based on these statistical measures, whenever there's a new request for work execution
 we calculate the present

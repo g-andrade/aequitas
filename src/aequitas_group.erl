@@ -12,7 +12,7 @@
 %%
 %% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 %% IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-%% FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+%% FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO WORK SHALL THE
 %% AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 %% LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 %% FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
@@ -69,7 +69,7 @@
 -define(DEFAULT_MAX_WINDOW_SIZE, 10000).
 -define(DEFAULT_MAX_WINDOW_DURATION, 5000).
 
--define(DEFAULT_EVENT_WEIGHT, 1).
+-define(DEFAULT_WORK_WEIGHT, 1).
 -define(DEFAULT_MAX_ZSCORE, 3).
 
 -define(is_pos_integer(V), (is_integer((V)) andalso ((V) > 0))).
@@ -84,12 +84,12 @@
          }).
 -type settings() :: #settings{}.
 
--record(event, {
-          id :: term(),
+-record(work, {
+          actor :: term(),
           weight :: pos_integer(),
           timestamp :: integer()
          }).
--type event() :: #event{}.
+-type work() :: #work{}.
 
 -record(work_stats, {
           sum = 0 :: non_neg_integer(), % used to calculate mean
@@ -103,7 +103,7 @@
           group :: atom(), % the group identifier
           settings :: settings(), % the group settings
           %%
-          window :: queue:queue(event()), % the event window
+          window :: queue:queue(work()), % sliding window
           window_size :: non_neg_integer(), % queue:len/1 is expensive
           %%
           work_shares :: #{ term() => pos_integer() }, % work share per actor
@@ -323,16 +323,16 @@ loop(Parent, Debug, State) ->
                 Msg ->
                     handle_msg(Msg, Parent, Debug, State)
             end;
-        {drop, Event} ->
-            UpdatedState = drop_event(Event, State),
+        {drop, Work} ->
+            UpdatedState = drop_work(Work, State),
             loop(Parent, Debug, UpdatedState);
-        {drop_after, Event, WaitTime} ->
+        {drop_after, Work, WaitTime} ->
             receive
                 Msg ->
                     handle_msg(Msg, Parent, Debug, State)
             after
                 WaitTime ->
-                    UpdatedState = drop_event(Event, State),
+                    UpdatedState = drop_work(Work, State),
                     loop(Parent, Debug, UpdatedState)
             end;
         {stop_after, WaitTime} ->
@@ -346,36 +346,36 @@ loop(Parent, Debug, State) ->
     end.
 
 loop_action(State) ->
-    EventPeek = queue:peek(State#state.window),
+    WorkPeek = queue:peek(State#state.window),
     Settings = State#state.settings,
-    loop_action(EventPeek, Settings, State).
+    loop_action(WorkPeek, Settings, State).
 
-loop_action({value, Event}, Settings, State)
+loop_action({value, Work}, Settings, State)
   when Settings#settings.max_window_size < State#state.window_size ->
-    {drop, Event};
-loop_action({value, Event}, Settings, _State)
+    {drop, Work};
+loop_action({value, Work}, Settings, _State)
   when Settings#settings.max_window_duration =/= infinity ->
     Now = erlang:monotonic_time(milli_seconds),
-    ExpirationTs = Event#event.timestamp + Settings#settings.max_window_duration,
+    ExpirationTs = Work#work.timestamp + Settings#settings.max_window_duration,
     WaitTime = ExpirationTs - Now,
     case WaitTime =< 0 of
         true ->
-            {drop, Event};
+            {drop, Work};
         _ ->
-            {drop_after, Event, WaitTime}
+            {drop_after, Work, WaitTime}
     end;
 loop_action(empty, Settings, _State)
   when Settings#settings.max_window_duration =/= infinity ->
     IdleTimeout = Settings#settings.max_window_duration,
     {stop_after, IdleTimeout};
-loop_action(_Event, _Settings, _State) ->
+loop_action(_Work, _Settings, _State) ->
     simple.
 
-drop_event(Event, State) ->
+drop_work(Work, State) ->
     UpdatedWindow = queue:drop(State#state.window),
     UpdatedWindowSize = State#state.window_size - 1,
     {PrevShare, UpdatedShare, UpdatedWorkShares} =
-        update_work_share(Event#event.id, -Event#event.weight, State#state.work_shares),
+        update_work_share(Work#work.actor, -Work#work.weight, State#state.work_shares),
     UpdatedWorkStats =
         update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, State#state.work_stats),
     State#state{
@@ -417,7 +417,7 @@ handle_settings_reload(State) ->
 parse_ask_opts(Opts) ->
     DefaultParams =
         #ask_params{
-           weight = ?DEFAULT_EVENT_WEIGHT,
+           weight = ?DEFAULT_WORK_WEIGHT,
            max_zscore = ?DEFAULT_MAX_ZSCORE
           },
     parse_ask_opts(Opts, DefaultParams).
@@ -445,21 +445,21 @@ handle_ask(Actor, Params, State) ->
 
 accept(Actor, Params, State)
   when State#state.window_size >= (State#state.settings)#settings.max_window_size ->
-    {value, Event} = queue:peek(State#state.window),
-    UpdatedState = drop_event(Event, State),
+    {value, Work} = queue:peek(State#state.window),
+    UpdatedState = drop_work(Work, State),
     accept(Actor, Params, UpdatedState);
 accept(Actor, Params, State) ->
-    Event =
-        #event{
-           id = Actor,
+    Work =
+        #work{
+           actor = Actor,
            weight = Params#ask_params.weight,
            timestamp = erlang:monotonic_time(milli_seconds)
           },
 
-    UpdatedWindow = queue:in(Event, State#state.window),
+    UpdatedWindow = queue:in(Work, State#state.window),
     UpdatedWindowSize = State#state.window_size + 1,
     {PrevShare, UpdatedShare, UpdatedWorkShares} =
-        update_work_share(Event#event.id, Params#ask_params.weight, State#state.work_shares),
+        update_work_share(Work#work.actor, Params#ask_params.weight, State#state.work_shares),
     UpdatedWorkStats =
         update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, State#state.work_stats),
     State#state{
