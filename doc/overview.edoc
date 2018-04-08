@@ -11,12 +11,12 @@
 == aequitas - Fairness Regulator  ==
 
 `aequitas' is a library for Erlang/OTP and Elixir that allows you to fairly
-distribute system capacity to different identifiers within a group.
+distribute system capacity within a group of identifiers.
 
 === Example ===
 
-Let's say we've got a web server handling HTTP requests. We want to ensure
-misbehaving IP addresses don't steal (too much) system capacity from benevolent clients.
+There's a web server handling HTTP requests. We want to ensure misbehaving
+IP addresses don't steal (too much) system capacity from benevolent clients.
 
 As such, before we handle each HTTP request we ask `aequitas' whether
 an IP address can be granted work based on the statistical distribution
@@ -35,40 +35,44 @@ We'll name our group `http_requests' (any atom will do.)
 end.]]>
 </pre>
 
+`aequitas' is not a rate limiter; it only intends on preventing gluttonous
+actors from taking over a system. But it can be combined with one.
+
 === Event Tracking ===
 
-A group keeps track of how many work units were attributed to each identifier
-within the last `N' events; the size of the event window, `N', is determined by
-constraints derived from from the group  settings:
+A group keeps a sliding window that tracks how many work units were attributed
+to each identifier within the last `N' events; the maximum size of the event window,
+`N', is determined by constraints derived from from the group  settings:
 
 <ul>
 <li>`max_window_size': Enforces a ceiling on how many events we're allowed to track (defaults to 10000)</li>
 <li>`max_window_duration': Enforces a maximum age for events (defaults to 5000ms)</li>
 </ul>
 
-Whichever of these limits is reached first will trigger a drop of old events until it is no longer so.
+Whichever of these limits is reached first will trigger a drop of old events
+until the window is below both limits again.
 
 === Rationale ===
 
-Both the mean and the standard deviation of work share, per identifier - for events within
-the event window - are calculated in a rolling fashion.
+Both the mean of and the standard deviation from work share are calculated,
+in a rolling fashion, for events within the window.
 
 Based on these statistical measures, whenever there's a new request for work execution
-we calculate what would the
+we calculate the present
 <a target="_parent" href="https://en.wikipedia.org/wiki/Standard_score">z-score</a> of
-the identifier become if the work were allowed to go through. The z-score, or standard score, is
+the identifier within the overall work performed. The z-score, or standard score, is
 the signed number of standard deviations above the mean.
 
 Assuming that work distribution among identifiers approximates the
 <a target="_parent" href="https://en.wikipedia.org/wiki/Normal_distribution">normal distribution</a>,
 we can apply the
 <a target="_parent" href="https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule">68–95–99.7 rule</a>
-when there's enough samples.
+when there's enough events.
 
 Taking the above into account, we can reject the `~2.275%' higher quantile (`(100 - 95.45) / 2') of
-work requests - the outliers that are eating up most work - by rejecting work requests whose
-identifiers would end up with a z-score higher than `2'. That is: identifiers whose
-work share would be placed more than two standard deviations from the work share mean.
+work requests - the outliers that are eating up most system capacity - by rejecting work requests whose
+identifiers go above `2'. That is: identifiers whose work is placed more than two
+standard deviations above the work share mean.
 
 === Custom Rejection Threshold ===
 
@@ -76,7 +80,7 @@ The default work rejection threshold - how many standard deviations above the me
 is the work share of an identifier allowed to be - is `2'.
 
 This can be customized by specifying the `max_zscore' option when asking permission
-to execute. It can be any number or the atom 'infinity'.
+to execute. It can be any number or `infinity'.
 
 Picking the web server example above, if we wanted to be stricter
 about upper quantile outliers, we could lower `max_zscore' to `1' - which
@@ -114,6 +118,9 @@ case aequitas:ask(http_requests, IPAddress, [{weight, Weight}]) of
         {429, <<>>}
 end.]]>
 </pre>
+
+This way, few large requests from an IP address could consume as much, or more
+work units than many small requests from another IP address.
 
 === License ===
 
