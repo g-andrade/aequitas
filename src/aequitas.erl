@@ -51,16 +51,16 @@
 %% Returns:
 %% <ul>
 %% <li>`{accepted, Metrics}' if work execution was granted</li>
-%% <li>`{refused, Metrics}' if work execution was denied</li>
+%% <li>`{rejected, Metrics}' if work execution was denied</li>
 %% <li>`{error, term()}' otherwise</li>
 %% </ul>
 %% @see ask/2
 %% @see ask/3
 -spec ask(Group)
-        -> {accepted | refused, Metrics} |
+        -> {accepted | rejected, Metrics} |
            {error, ErrorReason}
     when Group :: atom(),
-         Metrics :: #{ deviation => number() },
+         Metrics :: #{ zscore => number() },
          ErrorReason :: term().
 ask(Group) ->
     ask(Group, self()).
@@ -75,17 +75,17 @@ ask(Group) ->
 %% Returns:
 %% <ul>
 %% <li>`{accepted, Metrics}' if work execution was granted</li>
-%% <li>`{refused, Metrics}' if work execution was denied</li>
+%% <li>`{rejected, Metrics}' if work execution was denied</li>
 %% <li>`{error, term()}' otherwise</li>
 %% </ul>
 %% @see ask/1
 %% @see ask/3
 -spec ask(Group, Id)
-        -> {accepted | refused, Metrics} |
+        -> {accepted | rejected, Metrics} |
            {error, ErrorReason}
     when Group :: atom(),
          Id :: term(),
-         Metrics :: #{ deviation => number() },
+         Metrics :: #{ zscore => number() },
          ErrorReason :: term().
 ask(Group, Id) ->
     ask(Group, Id, []).
@@ -101,18 +101,18 @@ ask(Group, Id) ->
 %% Returns:
 %% <ul>
 %% <li>`{accepted, Metrics}' if work execution was granted</li>
-%% <li>`{refused, Metrics}' if work execution was denied</li>
+%% <li>`{rejected, Metrics}' if work execution was denied</li>
 %% <li>`{error, term()}' otherwise</li>
 %% </ul>
 %% @see ask/2
 %% @see ask/3
 -spec ask(Group, Id, Opts)
-        -> {accepted | refused, Metrics} |
+        -> {accepted | rejected, Metrics} |
            {error, ErrorReason}
     when Group :: atom(),
          Id :: term(),
          Opts :: [aequitas_group:ask_opt()],
-         Metrics :: #{ deviation => number() },
+         Metrics :: #{ zscore => number() },
          ErrorReason :: term().
 ask(Group, Id, Opts) ->
     aequitas_group:ask(Group, Id, Opts).

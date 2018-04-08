@@ -68,9 +68,8 @@
 -define(DEFAULT_MAX_WINDOW_DURATION, 1000).
 
 -define(DEFAULT_EVENT_WEIGHT, 1).
--define(DEFAULT_MAX_DEVIATION, 3).
+-define(DEFAULT_MAX_ZSCORE, 3).
 
--define(is_nonneg_integer(V), (is_integer((V)) andalso ((V) >= 0))).
 -define(is_pos_integer(V), (is_integer((V)) andalso ((V) > 0))).
 
 %%-------------------------------------------------------------------
@@ -78,8 +77,8 @@
 %%-------------------------------------------------------------------
 
 -record(settings, {
-          max_window_size :: non_neg_integer() | infinity,
-          max_window_duration :: non_neg_integer() | infinity
+          max_window_size :: pos_integer() | infinity,
+          max_window_duration :: pos_integer() | infinity
          }).
 -type settings() :: #settings{}.
 
@@ -111,13 +110,13 @@
 -type state() :: #state{}.
 
 -type setting_opt() ::
-        {max_window_size, non_neg_integer() | infinity} |
-        {max_window_duration, non_neg_integer() | infinity}.
+        {max_window_size, pos_integer() | infinity} |
+        {max_window_duration, pos_integer() | infinity}.
 -export_type([setting_opt/0]).
 
 -type ask_opt() ::
         {weight, pos_integer()} |
-        {max_deviation, number()}.
+        {max_zscore, number()}.
 -export_type([ask_opt/0]).
 
 %%-------------------------------------------------------------------
@@ -130,13 +129,13 @@ start_link(Group) ->
     proc_lib:start_link(?MODULE, init, [{self(), [Group]}]).
 
 -spec ask(atom(), term(), [ask_opt()])
-        -> {accepted | refused, #{ deviation => number() }} |
+        -> {accepted | refused, #{ zscore => number() }} |
            {error, {process_down, term()}}.
 %% @private
 ask(Group, Id, Opts) ->
     Weight = proplists:get_value(weight, Opts, ?DEFAULT_EVENT_WEIGHT),
-    MaxDeviation = proplists:get_value(max_deviation, Opts, ?DEFAULT_MAX_DEVIATION),
-    ask(Group, Id, Weight, MaxDeviation).
+    MaxZScore = proplists:get_value(max_zscore, Opts, ?DEFAULT_MAX_ZSCORE),
+    ask(Group, Id, Weight, MaxZScore).
 
 -spec set_settings(atom(), [setting_opt()]) -> ok | {error, bad_settings}.
 %% @private
@@ -250,17 +249,17 @@ settings(SettingOpts) ->
     settings(MaxWindowSize, MaxWindowDuration).
 
 settings(MaxWindowSize, MaxWindowDuration)
-  when (?is_nonneg_integer(MaxWindowSize) orelse MaxWindowSize =:= infinity),
-       (?is_nonneg_integer(MaxWindowDuration) orelse MaxWindowSize =:= infinity) ->
+  when (?is_pos_integer(MaxWindowSize) orelse MaxWindowSize =:= infinity),
+       (?is_pos_integer(MaxWindowDuration) orelse MaxWindowSize =:= infinity) ->
     #settings{
        max_window_size = MaxWindowSize,
        max_window_duration = MaxWindowDuration
       }.
 
-ask(Group, Id, Weight, MaxDeviation)
-  when is_atom(Group), ?is_pos_integer(Weight), is_number(MaxDeviation) ->
-    call(Group, {ask, Id, Weight, MaxDeviation});
-ask(_Group, _Id, _Weight, _MaxDeviation) ->
+ask(Group, Id, Weight, MaxZScore)
+  when is_atom(Group), ?is_pos_integer(Weight), is_number(MaxZScore) ->
+    call(Group, {ask, Id, Weight, MaxZScore});
+ask(_Group, _Id, _Weight, _MaxZScore) ->
     error(badarg).
 
 call(Group, Content) ->
@@ -383,41 +382,64 @@ handle_nonsystem_msg(reload_settings, Parent, Debug, State) ->
 handle_nonsystem_msg(Msg, _Parent, _Debug, _State) ->
     error({unexpected_msg, Msg}).
 
-handle_call({ask, Id, Weight, MaxDeviation}, State) ->
-    Deviation = deviation(Id, State),
-    case Deviation >= MaxDeviation of
-        true ->
-            {{refused, #{ deviation => Deviation }}, State};
-        _ ->
-            Event =
-                #event{
-                   id = Id,
-                   weight = Weight,
-                   timestamp = erlang:monotonic_time(milli_seconds)
-                  },
-
-            UpdatedWindow = queue:in(Event, State#state.window),
-            UpdatedWindowSize = State#state.window_size + 1,
-            {PrevShare, UpdatedShare, UpdatedWorkShares} =
-                update_work_share(Event#event.id, Weight, State#state.work_shares),
-            UpdatedWorkStats =
-                update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, State#state.work_stats),
-            UpdatedState =
-                State#state{
-                  window = UpdatedWindow,
-                  window_size = UpdatedWindowSize,
-                  work_shares = UpdatedWorkShares,
-                  work_stats = UpdatedWorkStats
-                 },
-            {{accepted, #{ deviation => Deviation }}, UpdatedState}
-    end.
+handle_call({ask, Id, Weight, MaxZScore}, State) ->
+    handle_ask(Id, Weight, MaxZScore, State).
 
 handle_settings_reload(State) ->
     State#state{
       settings = load_settings(State#state.group)
      }.
 
-deviation(Id, State) ->
+%%-------------------------------------------------------------------
+%% Internal Functions Definitions - Asking
+%%-------------------------------------------------------------------
+
+handle_ask(Id, Weight, MaxZScore, UnaffectedState) ->
+    StateBeforeAccept = tentatively_make_room_before_accepting(UnaffectedState),
+    StateAfterAccept = tentatively_accept(Id, Weight, StateBeforeAccept),
+    ZScore = zscore(Id, StateAfterAccept),
+    Metrics = #{ zscore => ZScore },
+    case ZScore < MaxZScore of
+        true ->
+            {{accepted, Metrics}, StateAfterAccept};
+        _ ->
+            {{rejected, Metrics}, UnaffectedState}
+    end.
+
+tentatively_make_room_before_accepting(State) ->
+    EventPeek = queue:peek(State#state.window),
+    Settings = State#state.settings,
+    tentatively_make_room_before_accepting(EventPeek, Settings, State).
+
+tentatively_make_room_before_accepting({value, Event}, Settings, State)
+  when Settings#settings.max_window_size =< State#state.window_size ->
+    UpdatedState = drop_event(Event, State),
+    tentatively_make_room_before_accepting(UpdatedState);
+tentatively_make_room_before_accepting(_Peek, _Settings, State) ->
+    State.
+
+tentatively_accept(Id, Weight, State) ->
+    Event =
+        #event{
+           id = Id,
+           weight = Weight,
+           timestamp = erlang:monotonic_time(milli_seconds)
+          },
+
+    UpdatedWindow = queue:in(Event, State#state.window),
+    UpdatedWindowSize = State#state.window_size + 1,
+    {PrevShare, UpdatedShare, UpdatedWorkShares} =
+        update_work_share(Event#event.id, Weight, State#state.work_shares),
+    UpdatedWorkStats =
+        update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, State#state.work_stats),
+    State#state{
+      window = UpdatedWindow,
+      window_size = UpdatedWindowSize,
+      work_shares = UpdatedWorkShares,
+      work_stats = UpdatedWorkStats
+     }.
+
+zscore(Id, State) ->
     % Standard score / Z-score:
     % https://en.wikipedia.org/wiki/Standard_score
     WorkStats = State#state.work_stats,
