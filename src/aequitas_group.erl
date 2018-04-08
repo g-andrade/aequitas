@@ -335,13 +335,13 @@ loop(Parent, Debug, State) ->
                     UpdatedState = drop_work(Work, State),
                     loop(Parent, Debug, UpdatedState)
             end;
-        {stop_after, WaitTime} ->
+        {hibernate_after, WaitTime} ->
             receive
                 Msg ->
                     handle_msg(Msg, Parent, Debug, State)
             after
                 WaitTime ->
-                    exit(normal)
+                    hibernate(Parent, Debug, State)
             end
     end.
 
@@ -367,7 +367,7 @@ loop_action({value, Work}, Settings, _State)
 loop_action(empty, Settings, _State)
   when Settings#settings.max_window_duration =/= infinity ->
     IdleTimeout = Settings#settings.max_window_duration,
-    {stop_after, IdleTimeout};
+    {hibernate_after, IdleTimeout};
 loop_action(_Work, _Settings, _State) ->
     simple.
 
@@ -409,6 +409,9 @@ handle_settings_reload(State) ->
     State#state{
       settings = load_settings(State#state.group)
      }.
+
+hibernate(Parent, Debug, State) ->
+    proc_lib:hibernate(?MODULE, system_continue, [Parent, Debug, State]).
 
 %%-------------------------------------------------------------------
 %% Internal Functions Definitions - Asking
