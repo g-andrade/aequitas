@@ -126,8 +126,9 @@ assert_app_config_validity() ->
       fun ({{group, Group}, SettingOpts}) when is_atom(Group) ->
               case aequitas_group:validate_settings(SettingOpts) of
                   ok -> ok;
-                  {error, bad_settings} ->
-                      error({bad_group_settings, Group, SettingOpts})
+                  {error, Reason} ->
+                      error(#{ group => Group,
+                               reason => Reason })
               end;
           ({_, _}) ->
               ok

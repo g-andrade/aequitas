@@ -98,7 +98,7 @@ ask(Group, Id, Opts) ->
 %% <li>`{error, term()}' otherwise</li>
 %% </ul>
 -spec configure(Group, SettingOpts)
-        -> ok | {error, bad_settings}
+        -> ok | {error, term()}
     when Group :: atom(),
          SettingOpts :: [aequitas_group:setting_opt()].
 configure(Group, SettingOpts) ->

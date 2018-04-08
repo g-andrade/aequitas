@@ -136,7 +136,7 @@ ask(Group, Id, Opts) ->
     MaxZScore = proplists:get_value(max_zscore, Opts, ?DEFAULT_MAX_ZSCORE),
     ask(Group, Id, Weight, MaxZScore).
 
--spec set_settings(atom(), [setting_opt()]) -> ok | {error, bad_settings}.
+-spec set_settings(atom(), [setting_opt()]) -> ok | {error, term()}.
 %% @private
 set_settings(Group, SettingOpts) ->
     case validate_settings(SettingOpts) of
@@ -147,15 +147,14 @@ set_settings(Group, SettingOpts) ->
             {error, Reason}
     end.
 
--spec validate_settings([setting_opt()]) -> ok | {error, bad_settings}.
+-spec validate_settings([setting_opt()]) -> ok | {error, term()}.
 %% @private
 validate_settings(SettingOpts) ->
-    try settings(SettingOpts) of
-        #settings{} ->
-            ok
-    catch
-        _Class:_Reason ->
-            {error, bad_settings}
+    case parse_settings_opts(SettingOpts) of
+        {ok, _Settings} ->
+            ok;
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 -spec reload_settings(atom()) -> ok.
@@ -233,27 +232,32 @@ server_name(Group) ->
 
 load_settings(Group) ->
     SettingOpts = aequitas_cfg:get({group, Group}, []),
-    try
-        settings(SettingOpts)
-    catch
-        _Class:_Reason ->
-            error({bad_settings, SettingOpts})
+    case parse_settings_opts(SettingOpts) of
+        {ok, Settings} ->
+            Settings;
+        {error, Reason} ->
+            error(#{ group => Group, reason => Reason })
     end.
 
-settings(SettingOpts) ->
-    MaxWindowSize =
-        proplists:get_value(max_window_size, SettingOpts, ?DEFAULT_MAX_WINDOW_SIZE),
-    MaxWindowDuration =
-        proplists:get_value(max_window_duration, SettingOpts, ?DEFAULT_MAX_WINDOW_DURATION),
-    settings(MaxWindowSize, MaxWindowDuration).
+parse_settings_opts(SettingOpts) ->
+    DefaultSettings =
+        #settings{ max_window_size = ?DEFAULT_MAX_WINDOW_SIZE,
+                   max_window_duration = ?DEFAULT_MAX_WINDOW_DURATION
+                 },
+    parse_settings_opts(SettingOpts, DefaultSettings).
 
-settings(MaxWindowSize, MaxWindowDuration)
-  when (?is_pos_integer(MaxWindowSize) orelse MaxWindowSize =:= infinity),
-       (?is_pos_integer(MaxWindowDuration) orelse MaxWindowSize =:= infinity) ->
-    #settings{
-       max_window_size = MaxWindowSize,
-       max_window_duration = MaxWindowDuration
-      }.
+parse_settings_opts([{max_window_size, MaxWindowSize} | Next], Acc)
+  when ?is_pos_integer(MaxWindowSize); MaxWindowSize =:= infinity ->
+    parse_settings_opts(Next, Acc#settings{ max_window_size = MaxWindowSize });
+parse_settings_opts([{max_window_duration, MaxWindowDuration} | Next], Acc)
+  when ?is_pos_integer(MaxWindowDuration); MaxWindowDuration =:= infinity ->
+    parse_settings_opts(Next, Acc#settings{ max_window_duration = MaxWindowDuration });
+parse_settings_opts([], Acc) ->
+    {ok, Acc};
+parse_settings_opts([InvalidOpt | _Next], _Acc) ->
+    {error, {invalid_setting_opt, InvalidOpt}};
+parse_settings_opts(InvalidOpts, _Acc) ->
+    {error, {invalid_setting_opts, InvalidOpts}}.
 
 ask(Group, Id, Weight, MaxZScore)
   when is_atom(Group), ?is_pos_integer(Weight), is_number(MaxZScore) ->
