@@ -34,7 +34,8 @@
     async_ask/3,
     set_settings/2,
     validate_settings/1,
-    reload_settings/1
+    reload_settings/1,
+    async_reload_settings/1
    ]).
 
 -ignore_xref(
@@ -178,8 +179,14 @@ validate_settings(SettingOpts) ->
 %% @private
 reload_settings(Group) when is_atom(Group) ->
     Pid = ensure_server(Group),
-    send_cast(Pid, reload_settings),
-    ok.
+    {Tag, Mon} = send_call(Pid, reload_settings),
+    wait_call_reply(Tag, Mon).
+
+-spec async_reload_settings(atom()) -> ok.
+%% @private
+async_reload_settings(Group) when is_atom(Group) ->
+    Pid = ensure_server(Group),
+    send_cast(Pid, reload_settings).
 
 %%-------------------------------------------------------------------
 %% OTP Function Definitions
@@ -387,6 +394,10 @@ handle_msg(Msg, Parent, Debug, State) ->
 handle_nonsystem_msg({call, Pid, Tag, {ask, Id, Params}}, Parent, Debug, State) ->
     {Reply, UpdatedState} = handle_ask(Id, Params, State),
     Pid ! {Tag, Reply},
+    loop(Parent, Debug, UpdatedState);
+handle_nonsystem_msg({call, Pid, Tag, reload_settings}, Parent, Debug, State) ->
+    UpdatedState = handle_settings_reload(State),
+    Pid ! {Tag, ok},
     loop(Parent, Debug, UpdatedState);
 handle_nonsystem_msg({cast, reload_settings}, Parent, Debug, State) ->
     UpdatedState = handle_settings_reload(State),

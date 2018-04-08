@@ -52,7 +52,7 @@ stop(_State) ->
 config_change(Changed, New, Removed) ->
     lists:foreach(
       fun ({{group, Group}, _SettingOpts}) when is_atom(Group) ->
-              aequitas_group:reload_settings(Group);
+              aequitas_group:async_reload_settings(Group);
           ({_, _}) ->
               ok
       end,
@@ -60,7 +60,7 @@ config_change(Changed, New, Removed) ->
 
     lists:foreach(
       fun ({group, Group}) when is_atom(Group) ->
-              aequitas_group:reload_settings(Group);
+              aequitas_group:async_reload_settings(Group);
           (_) ->
               ok
       end,
