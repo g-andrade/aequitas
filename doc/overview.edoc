@@ -98,7 +98,7 @@ asking permission to execute. It must be a positive integer
 and the default value is '1'.
 
 Picking the web server example above, if we were to weight our requests
-using web size, it would become something like this:
+using their body size, it would become something like this:
 
 <pre lang="erlang" class="erlang">
 <![CDATA[ReqBodySize = req_body_size(...),
