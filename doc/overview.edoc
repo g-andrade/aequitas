@@ -13,7 +13,7 @@
 `aequitas' is a library for Erlang/OTP and Elixir that allows you to fairly
 distribute system capacity within a group of actors.
 
-=== Example ===
+=== Use Case ===
 
 There's a web server handling HTTP requests. We want to ensure misbehaving
 IP addresses don't steal (too much) system capacity from benevolent clients.
@@ -79,7 +79,7 @@ we calculate the present
 the actor within the overall work performed. This z-score, or standard score, is
 the signed number of standard deviations above the mean.
 
-Assuming that work distribution among actors approximates the
+Assuming that work share distribution among actors approximates the
 <a target="_parent" href="https://en.wikipedia.org/wiki/Normal_distribution">normal distribution</a>,
 we can apply the
 <a target="_parent" href="https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule">68–95–99.7 rule</a>
