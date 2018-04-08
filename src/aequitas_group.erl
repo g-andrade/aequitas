@@ -434,21 +434,21 @@ parse_ask_opts(InvalidOpts, _Acc) ->
     error({badarg, InvalidOpts}).
 
 handle_ask(Id, Params, State) ->
-    StateAfterAccept = tentatively_accept(Id, Params, State),
-    ZScore = zscore(Id, StateAfterAccept),
+    ZScore = zscore(Id, State),
     case ZScore =< Params#ask_params.max_zscore of
         true ->
-            {accepted, StateAfterAccept};
+            UpdatedState = accept(Id, Params, State),
+            {accepted, UpdatedState};
         _ ->
             {rejected, State}
     end.
 
-tentatively_accept(Id, Params, State)
+accept(Id, Params, State)
   when State#state.window_size >= (State#state.settings)#settings.max_window_size ->
     {value, Event} = queue:peek(State#state.window),
     UpdatedState = drop_event(Event, State),
-    tentatively_accept(Id, Params, UpdatedState);
-tentatively_accept(Id, Params, State) ->
+    accept(Id, Params, UpdatedState);
+accept(Id, Params, State) ->
     Event =
         #event{
            id = Id,
@@ -516,6 +516,6 @@ zscore(Id, State) ->
         0.0 ->
             0.0;
         StdDev ->
-            WorkShare = maps:get(Id, State#state.work_shares),
+            WorkShare = maps:get(Id, State#state.work_shares, 0),
             (WorkShare - WorkStats#work_stats.mean) / StdDev
     end.
