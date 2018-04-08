@@ -109,6 +109,11 @@
          }).
 -type state() :: #state{}.
 
+-record(ask_params, {
+          weight :: pos_integer(),
+          max_zscore :: number() | infinity
+         }).
+
 -type setting_opt() ::
         {max_window_size, pos_integer() | infinity} |
         {max_window_duration, pos_integer() | infinity}.
@@ -116,7 +121,7 @@
 
 -type ask_opt() ::
         {weight, pos_integer()} |
-        {max_zscore, number()}.
+        {max_zscore, number() | infinity}.
 -export_type([ask_opt/0]).
 
 %%-------------------------------------------------------------------
@@ -132,9 +137,8 @@ start_link(Group) ->
         -> accepted | rejected.
 %% @private
 ask(Group, Id, Opts) ->
-    Weight = proplists:get_value(weight, Opts, ?DEFAULT_EVENT_WEIGHT),
-    MaxZScore = proplists:get_value(max_zscore, Opts, ?DEFAULT_MAX_ZSCORE),
-    ask(Group, Id, Weight, MaxZScore).
+    Params = parse_ask_opts(Opts),
+    call(Group, {ask, Id, Params}).
 
 -spec set_settings(atom(), [setting_opt()]) -> ok | {error, term()}.
 %% @private
@@ -224,11 +228,13 @@ system_code_change(State, _Module, _OldVsn, _Extra) ->
 %% Internal Functions Definitions - Initialization and Requests
 %%-------------------------------------------------------------------
 
-server_name(Group) ->
+server_name(Group) when is_atom(Group) ->
     list_to_atom(
       atom_to_list(?MODULE)
       ++ "."
-      ++ atom_to_list(Group)).
+      ++ atom_to_list(Group));
+server_name(Group) ->
+    error({badarg, Group}).
 
 load_settings(Group) ->
     SettingOpts = aequitas_cfg:get({group, Group}, []),
@@ -258,12 +264,6 @@ parse_settings_opts([InvalidOpt | _Next], _Acc) ->
     {error, {invalid_setting_opt, InvalidOpt}};
 parse_settings_opts(InvalidOpts, _Acc) ->
     {error, {invalid_setting_opts, InvalidOpts}}.
-
-ask(Group, Id, Weight, MaxZScore)
-  when is_atom(Group), ?is_pos_integer(Weight), is_number(MaxZScore) ->
-    call(Group, {ask, Id, Weight, MaxZScore});
-ask(_Group, _Id, _Weight, _MaxZScore) ->
-    error(badarg).
 
 call(Group, Content) ->
     {ok, ServerPid} = ensure_server(Group),
@@ -385,8 +385,8 @@ handle_nonsystem_msg(reload_settings, Parent, Debug, State) ->
 handle_nonsystem_msg(Msg, _Parent, _Debug, _State) ->
     error({unexpected_msg, Msg}).
 
-handle_call({ask, Id, Weight, MaxZScore}, State) ->
-    handle_ask(Id, Weight, MaxZScore, State).
+handle_call({ask, Id, Params}, State) ->
+    handle_ask(Id, Params, State).
 
 handle_settings_reload(State) ->
     State#state{
@@ -397,37 +397,52 @@ handle_settings_reload(State) ->
 %% Internal Functions Definitions - Asking
 %%-------------------------------------------------------------------
 
-handle_ask(Id, Weight, MaxZScore, UnaffectedState) ->
-    StateBeforeAccept = tentatively_make_room_before_accepting(UnaffectedState),
-    StateAfterAccept = tentatively_accept(Id, Weight, StateBeforeAccept),
+parse_ask_opts(Opts) ->
+    DefaultParams =
+        #ask_params{
+           weight = ?DEFAULT_EVENT_WEIGHT,
+           max_zscore = ?DEFAULT_MAX_ZSCORE
+          },
+    parse_ask_opts(Opts, DefaultParams).
+
+parse_ask_opts([{weight, Weight} | Next], Acc)
+  when ?is_pos_integer(Weight) ->
+    parse_ask_opts(Next, Acc#ask_params{ weight = Weight });
+parse_ask_opts([{max_zscore, MaxZScore} | Next], Acc)
+  when is_number(MaxZScore); MaxZScore =:= infinity ->
+    parse_ask_opts(Next, Acc#ask_params{ max_zscore = MaxZScore });
+parse_ask_opts([], Acc) ->
+    Acc;
+parse_ask_opts(InvalidOpts, _Acc) ->
+    error({badarg, InvalidOpts}).
+
+handle_ask(Id, Params, State) ->
+    StateAfterAccept = tentatively_accept(Id, Params, State),
     ZScore = zscore(Id, StateAfterAccept),
-    case ZScore < MaxZScore of
+    case ZScore =< Params#ask_params.max_zscore of
         true ->
             {accepted, StateAfterAccept};
         _ ->
-            {rejected, UnaffectedState}
+            {rejected, State}
     end.
 
-tentatively_make_room_before_accepting(State)
+tentatively_accept(Id, Params, State)
   when State#state.window_size >= (State#state.settings)#settings.max_window_size ->
     {value, Event} = queue:peek(State#state.window),
     UpdatedState = drop_event(Event, State),
-    tentatively_make_room_before_accepting(UpdatedState);
-tentatively_make_room_before_accepting(State) ->
-    State.
-
-tentatively_accept(Id, Weight, State) ->
+    tentatively_accept(Id, Params, UpdatedState);
+tentatively_accept(Id, Params, State) ->
     Event =
         #event{
            id = Id,
-           weight = Weight,
+           weight = Params#ask_params.weight,
            timestamp = erlang:monotonic_time(milli_seconds)
           },
 
     UpdatedWindow = queue:in(Event, State#state.window),
     UpdatedWindowSize = State#state.window_size + 1,
     {PrevShare, UpdatedShare, UpdatedWorkShares} =
-        update_work_share(Event#event.id, Weight, State#state.work_shares),
+        update_work_share(Event#event.id, Params#ask_params.weight, State#state.work_shares),
     UpdatedWorkStats =
         update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, State#state.work_stats),
     State#state{
