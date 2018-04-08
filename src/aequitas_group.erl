@@ -64,8 +64,8 @@
 %% Macro Definitions
 %%-------------------------------------------------------------------
 
--define(DEFAULT_MAX_WINDOW_SIZE, infinity).
--define(DEFAULT_MAX_WINDOW_DURATION, 1000).
+-define(DEFAULT_MAX_WINDOW_SIZE, 10000).
+-define(DEFAULT_MAX_WINDOW_DURATION, 5000).
 
 -define(DEFAULT_EVENT_WEIGHT, 1).
 -define(DEFAULT_MAX_ZSCORE, 3).
