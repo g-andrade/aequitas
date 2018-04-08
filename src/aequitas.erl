@@ -25,8 +25,7 @@
 %%-------------------------------------------------------------------
 
 -export(
-   [ask/1,
-    ask/2,
+   [ask/2,
     ask/3,
     configure/2
    ]).
@@ -41,29 +40,6 @@
 %%-------------------------------------------------------------------
 %% API Function Definitions
 %%-------------------------------------------------------------------
-
-%% @doc Like `:ask/2' but `Id' defaults to `self()'
-%%
-%% <ul>
-%% <li>`Group' must be an atom.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`{accepted, Metrics}' if work execution was granted</li>
-%% <li>`{rejected, Metrics}' if work execution was denied</li>
-%% <li>`{error, term()}' otherwise</li>
-%% </ul>
-%% @see ask/2
-%% @see ask/3
--spec ask(Group)
-        -> {accepted | rejected, Metrics} |
-           {error, ErrorReason}
-    when Group :: atom(),
-         Metrics :: #{ zscore => number() },
-         ErrorReason :: term().
-ask(Group) ->
-    ask(Group, self()).
 
 %% @doc Like `:ask/3' but with defaults options
 %%
