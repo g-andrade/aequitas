@@ -85,7 +85,7 @@
 -type settings() :: #settings{}.
 
 -record(work, {
-          actor :: term(),
+          actor_id :: term(),
           weight :: pos_integer(),
           timestamp :: integer()
          }).
@@ -137,21 +137,21 @@ start_link(Group) ->
 
 -spec ask(atom() | pid(), term(), [ask_opt()]) -> accepted | rejected.
 %% @private
-ask(Group, Actor, Opts) when is_atom(Group) ->
+ask(Group, ActorId, Opts) when is_atom(Group) ->
     Pid = ensure_server(Group),
-    ask(Pid, Actor, Opts);
-ask(Pid, Actor, Opts) when is_pid(Pid) ->
-    {Tag, Mon} = async_ask(Pid, Actor, Opts),
+    ask(Pid, ActorId, Opts);
+ask(Pid, ActorId, Opts) when is_pid(Pid) ->
+    {Tag, Mon} = async_ask(Pid, ActorId, Opts),
     wait_call_reply(Tag, Mon).
 
 -spec async_ask(atom() | pid(), term(), [ask_opt()]) -> {reference(), reference()}.
 %% @private
-async_ask(Group, Actor, Opts) when is_atom(Group) ->
+async_ask(Group, ActorId, Opts) when is_atom(Group) ->
     Pid = ensure_server(Group),
-    async_ask(Pid, Actor, Opts);
-async_ask(Pid, Actor, Opts) when is_pid(Pid) ->
+    async_ask(Pid, ActorId, Opts);
+async_ask(Pid, ActorId, Opts) when is_pid(Pid) ->
     Params = parse_ask_opts(Opts),
-    send_call(Pid, {ask, Actor, Params}).
+    send_call(Pid, {ask, ActorId, Params}).
 
 -spec set_settings(atom(), [setting_opt()])
         -> ok | {error, {invalid_setting_opt | invalid_setting_opts, _}}.
@@ -375,7 +375,7 @@ drop_work(Work, State) ->
     UpdatedWindow = queue:drop(State#state.window),
     UpdatedWindowSize = State#state.window_size - 1,
     {PrevShare, UpdatedShare, UpdatedWorkShares} =
-        update_work_share(Work#work.actor, -Work#work.weight, State#state.work_shares),
+        update_work_share(Work#work.actor_id, -Work#work.weight, State#state.work_shares),
     UpdatedWorkStats =
         update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, State#state.work_stats),
     State#state{
@@ -391,8 +391,8 @@ handle_msg(Msg, Parent, Debug, State) ->
     UpdatedDebug = sys:handle_debug(Debug, fun ?MODULE:write_debug/3, ?MODULE, {in, Msg}),
     handle_nonsystem_msg(Msg, Parent, UpdatedDebug, State).
 
-handle_nonsystem_msg({call, Pid, Tag, {ask, Actor, Params}}, Parent, Debug, State) ->
-    {Reply, UpdatedState} = handle_ask(Actor, Params, State),
+handle_nonsystem_msg({call, Pid, Tag, {ask, ActorId, Params}}, Parent, Debug, State) ->
+    {Reply, UpdatedState} = handle_ask(ActorId, Params, State),
     Pid ! {Tag, Reply},
     loop(Parent, Debug, UpdatedState);
 handle_nonsystem_msg({call, Pid, Tag, reload_settings}, Parent, Debug, State) ->
@@ -436,25 +436,25 @@ parse_ask_opts([], Acc) ->
 parse_ask_opts(InvalidOpts, _Acc) ->
     error({badarg, InvalidOpts}).
 
-handle_ask(Actor, Params, State) ->
-    ZScore = zscore(Actor, State),
+handle_ask(ActorId, Params, State) ->
+    ZScore = zscore(ActorId, State),
     case ZScore =< Params#ask_params.max_zscore of
         true ->
-            UpdatedState = accept(Actor, Params, State),
+            UpdatedState = accept(ActorId, Params, State),
             {accepted, UpdatedState};
         _ ->
             {rejected, State}
     end.
 
-accept(Actor, Params, State)
+accept(ActorId, Params, State)
   when State#state.window_size >= (State#state.settings)#settings.max_window_size ->
     {value, Work} = queue:peek(State#state.window),
     UpdatedState = drop_work(Work, State),
-    accept(Actor, Params, UpdatedState);
-accept(Actor, Params, State) ->
+    accept(ActorId, Params, UpdatedState);
+accept(ActorId, Params, State) ->
     Work =
         #work{
-           actor = Actor,
+           actor_id = ActorId,
            weight = Params#ask_params.weight,
            timestamp = erlang:monotonic_time(milli_seconds)
           },
@@ -462,7 +462,7 @@ accept(Actor, Params, State) ->
     UpdatedWindow = queue:in(Work, State#state.window),
     UpdatedWindowSize = State#state.window_size + 1,
     {PrevShare, UpdatedShare, UpdatedWorkShares} =
-        update_work_share(Work#work.actor, Params#ask_params.weight, State#state.work_shares),
+        update_work_share(Work#work.actor_id, Params#ask_params.weight, State#state.work_shares),
     UpdatedWorkStats =
         update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, State#state.work_stats),
     State#state{
@@ -472,21 +472,21 @@ accept(Actor, Params, State) ->
       work_stats = UpdatedWorkStats
      }.
 
-update_work_share(Actor, ShareIncr, WorkShares) ->
-    ShareLookup = maps:find(Actor, WorkShares),
-    update_work_share(Actor, ShareLookup, ShareIncr, WorkShares).
+update_work_share(ActorId, ShareIncr, WorkShares) ->
+    ShareLookup = maps:find(ActorId, WorkShares),
+    update_work_share(ActorId, ShareLookup, ShareIncr, WorkShares).
 
-update_work_share(Actor, {ok, Share}, ShareIncr, WorkShares) ->
-    update_existing_work_share(Actor, Share, Share + ShareIncr, WorkShares);
-update_work_share(Actor, error, ShareIncr, WorkShares) ->
-    UpdatedWorkShares = maps:put(Actor, ShareIncr, WorkShares),
+update_work_share(ActorId, {ok, Share}, ShareIncr, WorkShares) ->
+    update_existing_work_share(ActorId, Share, Share + ShareIncr, WorkShares);
+update_work_share(ActorId, error, ShareIncr, WorkShares) ->
+    UpdatedWorkShares = maps:put(ActorId, ShareIncr, WorkShares),
     {0, ShareIncr, UpdatedWorkShares}.
 
-update_existing_work_share(Actor, Share, UpdatedShare, WorkShares) when UpdatedShare =:= 0 ->
-    UpdatedWorkShares = maps:remove(Actor, WorkShares),
+update_existing_work_share(ActorId, Share, UpdatedShare, WorkShares) when UpdatedShare =:= 0 ->
+    UpdatedWorkShares = maps:remove(ActorId, WorkShares),
     {Share, UpdatedShare, UpdatedWorkShares};
-update_existing_work_share(Actor, Share, UpdatedShare, WorkShares) ->
-    UpdatedWorkShares = maps:update(Actor, UpdatedShare, WorkShares),
+update_existing_work_share(ActorId, Share, UpdatedShare, WorkShares) ->
+    UpdatedWorkShares = maps:update(ActorId, UpdatedShare, WorkShares),
     {Share, UpdatedShare, UpdatedWorkShares}.
 
 update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, WorkStats) ->
@@ -511,7 +511,7 @@ update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, WorkStats) ->
               }
     end.
 
-zscore(Actor, State) ->
+zscore(ActorId, State) ->
     % Standard score / Z-score:
     % https://en.wikipedia.org/wiki/Standard_score
     WorkStats = State#state.work_stats,
@@ -519,6 +519,6 @@ zscore(Actor, State) ->
         0.0 ->
             0.0;
         StdDev ->
-            WorkShare = maps:get(Actor, State#state.work_shares, 0),
+            WorkShare = maps:get(ActorId, State#state.work_shares, 0),
             (WorkShare - WorkStats#work_stats.mean) / StdDev
     end.

@@ -35,6 +35,8 @@ We'll name our group `http_requests' (any atom is allowed.)
 end.]]>
 </pre>
 
+Any term can represent a valid actor identifier.
+
 === Requirements ===
 
 <ul>
