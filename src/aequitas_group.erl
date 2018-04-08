@@ -92,22 +92,22 @@
 -type event() :: #event{}.
 
 -record(work_stats, {
-          sum = 0 :: non_neg_integer(),
-          squared_sum = 0 :: non_neg_integer(),
-          mean = 0.0 :: float(),
-          stddev = 0.0 :: float()
+          sum = 0 :: non_neg_integer(), % used to calculate mean
+          squared_sum = 0 :: non_neg_integer(), % used to calculate stddev
+          mean = 0.0 :: float(), % used to calculate stddev and z-score
+          stddev = 0.0 :: float() % used to calculate z-score
          }).
 -type work_stats() :: #work_stats{}.
 
 -record(state, {
-          group :: atom(),
-          settings :: settings(),
+          group :: atom(), % the group identifier
+          settings :: settings(), % the group settings
           %%
-          window :: queue:queue(event()),
+          window :: queue:queue(event()), % the event window
           window_size :: non_neg_integer(), % queue:len/1 is expensive
           %%
-          work_shares :: #{ term() => pos_integer() },
-          work_stats :: work_stats()
+          work_shares :: #{ term() => pos_integer() }, % work share per actor
+          work_stats :: work_stats() % used to calculate z-score
          }).
 -type state() :: #state{}.
 
