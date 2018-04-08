@@ -10,7 +10,7 @@ ifeq ($(REBAR3),)
 	REBAR3 = $(CURDIR)/rebar3
 endif
 
-.PHONY: all build clean check dialyzer xref test travis_test cover console doc publish
+.PHONY: all build clean check dialyzer xref test travis_test cover console microbenchmark doc publish
 
 all: build
 
@@ -42,6 +42,9 @@ cover: test
 
 console:
 	@$(REBAR3) as development shell --apps aequitas
+
+microbenchmark:
+	@$(REBAR3) as development shell --script microbenchmark.escript
 
 doc:
 	@$(REBAR3) edoc
