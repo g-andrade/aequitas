@@ -11,7 +11,7 @@
 == aequitas - Fairness Regulator  ==
 
 `aequitas' is a library for Erlang/OTP and Elixir that allows you to fairly
-distribute system capacity within a group of identifiers.
+distribute system capacity within a group of actors.
 
 === Example ===
 
@@ -41,7 +41,7 @@ actors from taking over a system. But it can be combined with one.
 === Event Tracking ===
 
 A group keeps a sliding window that tracks how many work units were attributed
-to each identifier within the last `N' events; the maximum size of the event window,
+to each actor within the last `N' events; the maximum size of the event window,
 `N', is determined by constraints derived from from the group  settings:
 
 <ul>
@@ -60,10 +60,10 @@ in a rolling fashion, for events within the window.
 Based on these statistical measures, whenever there's a new request for work execution
 we calculate the present
 <a target="_parent" href="https://en.wikipedia.org/wiki/Standard_score">z-score</a> of
-the identifier within the overall work performed. The z-score, or standard score, is
+the actor within the overall work performed. The z-score, or standard score, is
 the signed number of standard deviations above the mean.
 
-Assuming that work distribution among identifiers approximates the
+Assuming that work distribution among actors approximates the
 <a target="_parent" href="https://en.wikipedia.org/wiki/Normal_distribution">normal distribution</a>,
 we can apply the
 <a target="_parent" href="https://en.wikipedia.org/wiki/68%E2%80%9395%E2%80%9399.7_rule">68–95–99.7 rule</a>
@@ -71,13 +71,13 @@ when there's enough events.
 
 Taking the above into account, we can reject the `~2.275%' higher quantile (`(100 - 95.45) / 2') of
 work requests - the outliers that are eating up most system capacity - by rejecting work requests whose
-identifiers go above `2'. That is: identifiers whose work is placed more than two
+actors go above `2'. That is: actors whose work is placed more than two
 standard deviations above the work share mean.
 
 === Custom Rejection Threshold ===
 
 The default work rejection threshold - how many standard deviations above the mean
-is the work share of an identifier allowed to be - is `2'.
+is the work share of an actor allowed to be - is `2'.
 
 This can be customized by specifying the `max_zscore' option when asking permission
 to execute. It can be any number or `infinity'.

@@ -48,18 +48,18 @@
 %% @see ask/3
 %% @see async_ask/3
 %% @see async_ask/2
--spec ask(Group, Id)
+-spec ask(Group, Actor)
         -> accepted | rejected
     when Group :: atom(),
-         Id :: term().
-ask(Group, Id) ->
-    ask(Group, Id, []).
+         Actor :: term().
+ask(Group, Actor) ->
+    ask(Group, Actor, []).
 
-%% @doc Request permission to perform work identified under `Id' within `Group'
+%% @doc Request permission to perform work identified by `Actor', within `Group'
 %%
 %% <ul>
 %% <li>`Group' must be an atom.</li>
-%% <li>`Id' must be a term.</li>
+%% <li>`Actor' must be a term.</li>
 %% <li>`Opts' must be a list of `aequitas_group:ask_opt()' values</li>
 %% </ul>
 %%
@@ -71,25 +71,25 @@ ask(Group, Id) ->
 %% @see ask/2
 %% @see async_ask/3
 %% @see async_ask/2
--spec ask(Group, Id, Opts)
+-spec ask(Group, Actor, Opts)
         -> accepted | rejected
     when Group :: atom(),
-         Id :: term(),
+         Actor :: term(),
          Opts :: [aequitas_group:ask_opt()].
-ask(Group, Id, Opts) ->
-    aequitas_group:ask(Group, Id, Opts).
+ask(Group, Actor, Opts) ->
+    aequitas_group:ask(Group, Actor, Opts).
 
 %% @doc Like `:async_ask/3' but with defaults options
 %% @see async_ask/3
 %% @see ask/3
 %% @see ask/2
--spec async_ask(Group, Id) -> {Tag, Monitor}
+-spec async_ask(Group, Actor) -> {Tag, Monitor}
     when Group :: atom(),
-         Id :: term(),
+         Actor :: term(),
          Tag :: reference(),
          Monitor :: reference().
-async_ask(Group, Id) ->
-    async_ask(Group, Id, []).
+async_ask(Group, Actor) ->
+    async_ask(Group, Actor, []).
 
 %% @doc Like `:ask/3' but the reply is sent asynchronously
 %%
@@ -109,14 +109,14 @@ async_ask(Group, Id) ->
 %% @see async_ask/2
 %% @see ask/3
 %% @see ask/2
--spec async_ask(Group, Id, Opts) -> {Tag, Monitor}
+-spec async_ask(Group, Actor, Opts) -> {Tag, Monitor}
     when Group :: atom(),
-         Id :: term(),
+         Actor :: term(),
          Opts :: [aequitas_group:ask_opt()],
          Tag :: reference(),
          Monitor :: reference().
-async_ask(Group, Id, Opts) ->
-    aequitas_group:async_ask(Group, Id, Opts).
+async_ask(Group, Actor, Opts) ->
+    aequitas_group:async_ask(Group, Actor, Opts).
 
 %% @doc Tweak settings of work `Group'
 %%
