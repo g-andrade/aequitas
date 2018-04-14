@@ -37,12 +37,12 @@ wait_for_workers(WithMonitors, ResultAcc) ->
     end.
 
 run_worker(Group, Nr, Parent, NrOfCalls) ->
-    run_worker_loop(Group, Nr, Parent, NrOfCalls, erlang:monotonic_time(), 0).
+    run_worker_loop(Group, Nr, Parent, NrOfCalls, erlang:monotonic_time(milli_seconds), 0).
 
 run_worker_loop(_Group, _Nr, Parent, NrOfCalls, StartTs, Count) when Count =:= NrOfCalls ->
-    EndTs = erlang:monotonic_time(),
+    EndTs = erlang:monotonic_time(milli_seconds),
     TimeElapsed = EndTs - StartTs,
-    PerSecond = (Count * erlang:convert_time_unit(1, second, native)) / TimeElapsed,
+    PerSecond = (Count / (TimeElapsed / 1000)),
     Parent ! {worker_result, self(), PerSecond};
 run_worker_loop(Group, Nr, Parent, NrOfCalls, StartTs, Count) ->
     _ = aequitas:ask(Group, Nr),
