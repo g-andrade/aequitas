@@ -19,6 +19,8 @@
 %% DEALINGS IN THE SOFTWARE.
 
 %% @reference <a target="_parent" href="https://en.wikipedia.org/wiki/Standard_score">Standard Score / Z-Score</a>
+%% @reference <a target="_parent" href="http://www.statisticshowto.com/probability-and-statistics/hypothesis-testing/t-score-vs-z-score/">T-Score vs. Z-score</a>
+%% @reference <a target="_parent" href="https://www.itl.nist.gov/div898/handbook/eda/section3/eda35h.htm">Detection of Outliers</a>
 
 -module(aequitas_group).
 
