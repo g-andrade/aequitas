@@ -48,19 +48,19 @@
 %% @see ask/3
 %% @see async_ask/3
 %% @see async_ask/2
--spec ask(Group, ActorId)
+-spec ask(Category, ActorId)
         -> accepted | rejected
-    when Group :: atom(),
+    when Category :: atom(),
          ActorId :: term().
-ask(Group, ActorId) ->
-    ask(Group, ActorId, []).
+ask(Category, ActorId) ->
+    ask(Category, ActorId, []).
 
-%% @doc Request permission to perform work, identified under `ActorId', within `Group'
+%% @doc Request permission to perform work, identified under `ActorId', within `Category'
 %%
 %% <ul>
-%% <li>`Group' must be an atom.</li>
+%% <li>`Category' must be an atom.</li>
 %% <li>`ActorId' must be a term.</li>
-%% <li>`Opts' must be a list of `aequitas_group:ask_opt()' values</li>
+%% <li>`Opts' must be a list of `aequitas_category:ask_opt()' values</li>
 %% </ul>
 %%
 %% Returns:
@@ -71,25 +71,25 @@ ask(Group, ActorId) ->
 %% @see ask/2
 %% @see async_ask/3
 %% @see async_ask/2
--spec ask(Group, ActorId, Opts)
+-spec ask(Category, ActorId, Opts)
         -> accepted | rejected
-    when Group :: atom(),
+    when Category :: atom(),
          ActorId :: term(),
-         Opts :: [aequitas_group:ask_opt()].
-ask(Group, ActorId, Opts) ->
-    aequitas_group:ask(Group, ActorId, Opts).
+         Opts :: [aequitas_category:ask_opt()].
+ask(Category, ActorId, Opts) ->
+    aequitas_category:ask(Category, ActorId, Opts).
 
 %% @doc Like `:async_ask/3' but with defaults options
 %% @see async_ask/3
 %% @see ask/3
 %% @see ask/2
--spec async_ask(Group, ActorId) -> {Tag, Monitor}
-    when Group :: atom(),
+-spec async_ask(Category, ActorId) -> {Tag, Monitor}
+    when Category :: atom(),
          ActorId :: term(),
          Tag :: reference(),
          Monitor :: reference().
-async_ask(Group, ActorId) ->
-    async_ask(Group, ActorId, []).
+async_ask(Category, ActorId) ->
+    async_ask(Category, ActorId, []).
 
 %% @doc Like `:ask/3' but the reply is sent asynchronously
 %%
@@ -109,20 +109,20 @@ async_ask(Group, ActorId) ->
 %% @see async_ask/2
 %% @see ask/3
 %% @see ask/2
--spec async_ask(Group, ActorId, Opts) -> {Tag, Monitor}
-    when Group :: atom(),
+-spec async_ask(Category, ActorId, Opts) -> {Tag, Monitor}
+    when Category :: atom(),
          ActorId :: term(),
-         Opts :: [aequitas_group:ask_opt()],
+         Opts :: [aequitas_category:ask_opt()],
          Tag :: reference(),
          Monitor :: reference().
-async_ask(Group, ActorId, Opts) ->
-    aequitas_group:async_ask(Group, ActorId, Opts).
+async_ask(Category, ActorId, Opts) ->
+    aequitas_category:async_ask(Category, ActorId, Opts).
 
-%% @doc Tweak settings of work `Group'
+%% @doc Tweak settings of work `Category'
 %%
 %% <ul>
-%% <li>`Group' must be an atom.</li>
-%% <li>`SettingOpts' must be a list of `aequitas_group:setting_opt()' values</li>
+%% <li>`Category' must be an atom.</li>
+%% <li>`SettingOpts' must be a list of `aequitas_category:setting_opt()' values</li>
 %% </ul>
 %%
 %% Returns:
@@ -130,10 +130,10 @@ async_ask(Group, ActorId, Opts) ->
 %% <li>`ok' in case of success</li>
 %% <li>`{error, Reason}' otherwise</li>
 %% </ul>
--spec configure(Group, SettingOpts)
+-spec configure(Category, SettingOpts)
         -> ok | {error, Reason}
-    when Group :: atom(),
-         SettingOpts :: [aequitas_group:setting_opt()],
+    when Category :: atom(),
+         SettingOpts :: [aequitas_category:setting_opt()],
          Reason :: {invalid_setting_opt | invalid_setting_opts, term()}.
-configure(Group, SettingOpts) ->
-    aequitas_group:set_settings(Group, SettingOpts).
+configure(Category, SettingOpts) ->
+    aequitas_category:set_settings(Category, SettingOpts).

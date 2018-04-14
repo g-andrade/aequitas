@@ -72,8 +72,8 @@ init([]) ->
         [#{ id => cfg,
             start => {aequitas_cfg, start_link, []}
           },
-         #{ id => group_sup,
-            start => {aequitas_group_sup, start_link, []},
+         #{ id => category_sup,
+            start => {aequitas_category_sup, start_link, []},
             type => supervisor
           }],
     {ok, {SupFlags, ChildSpecs}}.

@@ -22,7 +22,7 @@
 %% @reference <a target="_parent" href="http://www.statisticshowto.com/probability-and-statistics/hypothesis-testing/t-score-vs-z-score/">T-Score vs. Z-score</a>
 %% @reference <a target="_parent" href="https://www.itl.nist.gov/div898/handbook/eda/section3/eda35h.htm">Detection of Outliers</a>
 
--module(aequitas_group).
+-module(aequitas_category).
 
 % https://gist.github.com/marcelog/97708058cd17f86326c82970a7f81d40#file-simpleproc-erl
 
@@ -102,8 +102,8 @@
 -type work_stats() :: #work_stats{}.
 
 -record(state, {
-          group :: atom(), % the group identifier
-          settings :: settings(), % the group settings
+          category :: atom(), % the category identifier
+          settings :: settings(), % the category settings
           %%
           window :: queue:queue(work()), % sliding window
           window_size :: non_neg_integer(), % queue:len/1 is expensive
@@ -134,13 +134,13 @@
 
 -spec start_link(atom()) -> {ok, pid()} | {error, already_started}.
 %% @private
-start_link(Group) ->
-    proc_lib:start_link(?MODULE, init, [{self(), [Group]}]).
+start_link(Category) ->
+    proc_lib:start_link(?MODULE, init, [{self(), [Category]}]).
 
 -spec ask(atom() | pid(), term(), [ask_opt()]) -> accepted | rejected.
 %% @private
-ask(Group, ActorId, Opts) when is_atom(Group) ->
-    Pid = ensure_server(Group),
+ask(Category, ActorId, Opts) when is_atom(Category) ->
+    Pid = ensure_server(Category),
     ask(Pid, ActorId, Opts);
 ask(Pid, ActorId, Opts) when is_pid(Pid) ->
     {Tag, Mon} = async_ask(Pid, ActorId, Opts),
@@ -148,8 +148,8 @@ ask(Pid, ActorId, Opts) when is_pid(Pid) ->
 
 -spec async_ask(atom() | pid(), term(), [ask_opt()]) -> {reference(), reference()}.
 %% @private
-async_ask(Group, ActorId, Opts) when is_atom(Group) ->
-    Pid = ensure_server(Group),
+async_ask(Category, ActorId, Opts) when is_atom(Category) ->
+    Pid = ensure_server(Category),
     async_ask(Pid, ActorId, Opts);
 async_ask(Pid, ActorId, Opts) when is_pid(Pid) ->
     Params = parse_ask_opts(Opts),
@@ -158,11 +158,11 @@ async_ask(Pid, ActorId, Opts) when is_pid(Pid) ->
 -spec set_settings(atom(), [setting_opt()])
         -> ok | {error, {invalid_setting_opt | invalid_setting_opts, _}}.
 %% @private
-set_settings(Group, SettingOpts) when is_atom(Group) ->
+set_settings(Category, SettingOpts) when is_atom(Category) ->
     case validate_settings(SettingOpts) of
         ok ->
-            aequitas_cfg:set({group, Group}, SettingOpts),
-            reload_settings(Group);
+            aequitas_cfg:set({category, Category}, SettingOpts),
+            reload_settings(Category);
         {error, Reason} ->
             {error, Reason}
     end.
@@ -179,15 +179,15 @@ validate_settings(SettingOpts) ->
 
 -spec reload_settings(atom()) -> ok.
 %% @private
-reload_settings(Group) when is_atom(Group) ->
-    Pid = ensure_server(Group),
+reload_settings(Category) when is_atom(Category) ->
+    Pid = ensure_server(Category),
     {Tag, Mon} = send_call(Pid, reload_settings),
     wait_call_reply(Tag, Mon).
 
 -spec async_reload_settings(atom()) -> ok.
 %% @private
-async_reload_settings(Group) when is_atom(Group) ->
-    Pid = ensure_server(Group),
+async_reload_settings(Category) when is_atom(Category) ->
+    Pid = ensure_server(Category),
     send_cast(Pid, reload_settings).
 
 %%-------------------------------------------------------------------
@@ -196,16 +196,16 @@ async_reload_settings(Group) when is_atom(Group) ->
 
 -spec init({pid(), [atom(), ...]}) -> no_return().
 %% @private
-init({Parent, [Group]}) ->
+init({Parent, [Category]}) ->
     Debug = sys:debug_options([]),
-    Server = server_name(Group),
+    Server = server_name(Category),
     try register(Server, self()) of
         true ->
-            Settings = load_settings(Group),
+            Settings = load_settings(Category),
             proc_lib:init_ack(Parent, {ok, self()}),
             State =
                 #state{
-                   group = Group,
+                   category = Category,
                    settings = Settings,
                    window = queue:new(),
                    window_size = 0,
@@ -246,11 +246,11 @@ system_code_change(State, _Module, _OldVsn, _Extra) ->
 %% Internal Functions Definitions - Initialization and Requests
 %%-------------------------------------------------------------------
 
-ensure_server(Group) ->
-    Server = server_name(Group),
+ensure_server(Category) ->
+    Server = server_name(Category),
     case whereis(Server) of
         undefined ->
-            case aequitas_group_sup:start_child([Group]) of
+            case aequitas_category_sup:start_child([Category]) of
                 {ok, Pid} ->
                     Pid;
                 {error, already_started} ->
@@ -260,19 +260,19 @@ ensure_server(Group) ->
             Pid
     end.
 
-server_name(Group) ->
+server_name(Category) ->
     list_to_atom(
       atom_to_list(?MODULE)
       ++ "."
-      ++ atom_to_list(Group)).
+      ++ atom_to_list(Category)).
 
-load_settings(Group) ->
-    SettingOpts = aequitas_cfg:get({group, Group}, []),
+load_settings(Category) ->
+    SettingOpts = aequitas_cfg:get({category, Category}, []),
     case parse_settings_opts(SettingOpts) of
         {ok, Settings} ->
             Settings;
         {error, Reason} ->
-            error(#{ group => Group, reason => Reason })
+            error(#{ category => Category, reason => Reason })
     end.
 
 parse_settings_opts(SettingOpts) ->
@@ -311,7 +311,7 @@ wait_call_reply(Tag, Mon) ->
             demonitor(Mon, [flush]),
             Reply;
         {'DOWN', Mon, process, _Pid, Reason} ->
-            error({group_process_stopped, Reason})
+            error({category_process_stopped, Reason})
     end.
 
 %%-------------------------------------------------------------------
@@ -409,7 +409,7 @@ handle_nonsystem_msg(Msg, _Parent, _Debug, _State) ->
 
 handle_settings_reload(State) ->
     State#state{
-      settings = load_settings(State#state.group)
+      settings = load_settings(State#state.category)
      }.
 
 hibernate(Parent, Debug, State) ->

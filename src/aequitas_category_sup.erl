@@ -19,7 +19,7 @@
 %% DEALINGS IN THE SOFTWARE.
 
 %% @private
--module(aequitas_group_sup).
+-module(aequitas_category_sup).
 -behaviour(supervisor).
 
 %% ------------------------------------------------------------------
@@ -73,8 +73,8 @@ init([]) ->
            period => 1
          },
     ChildSpecs =
-        [#{ id => group,
-            start => {aequitas_group, start_link, []},
+        [#{ id => category,
+            start => {aequitas_category, start_link, []},
             restart => temporary
           }
         ],

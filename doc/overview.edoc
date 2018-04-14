@@ -11,7 +11,7 @@
 == aequitas - Fairness Regulator  ==
 
 `aequitas' is a library for Erlang/OTP and Elixir that allows you to fairly
-distribute system capacity within a group of actors.
+distribute system capacity within a category of actors.
 
 === Use Case ===
 
@@ -22,7 +22,7 @@ As such, before we handle each HTTP request we ask `aequitas' whether
 an IP address can be granted work based on the statistical distribution
 of recent work allocations.
 
-We'll name our group `http_requests' (any atom is allowed.)
+We'll name our category `http_requests' (any atom is allowed.)
 
 <pre lang="erlang" class="erlang">
 <![CDATA[case aequitas:ask(http_requests, IPAddress) of
@@ -52,10 +52,10 @@ Documentation is hosted on <a target="_parent" href="https://hexdocs.pm/aequitas
 
 ==== Work Tracking ====
 
-Each group is a single process that keeps a sliding window; this sliding window tracks
+Each category is a single process that keeps a sliding window; this sliding window tracks
 how many work units were attributed to each actor within the last `N' accepted requests;.
 The maximum size of the sliding window, `N', is determined by constraints derived
-from the following group settings:
+from the following category settings:
 
 <ul>
 <li>`max_window_size': Enforces a ceiling on how many acceptances we're allowed to track (defaults to 10000)</li>
@@ -141,17 +141,17 @@ many small requests.
 
 ==== Static Configuration ====
 
-The configuration of foreknown groups can be tweaked in `app.config' / `sys.config'
-by declaring the overriden settings, per group, in the following fashion:
+The configuration of foreknown categories can be tweaked in `app.config' / `sys.config'
+by declaring the overriden settings, per category, in the following fashion:
 
 <pre lang="erlang" class="erlang">
 % ...
  {aequitas,
-  [{{group, http_requests},
+  [{{category, http_requests},
     [{max_window_duration, 10000} % Override default 5s to 10s
     ]},
 
-   {{group, rare_ftp_requests},
+   {{category, rare_ftp_requests},
     [{max_window_size, 100} % Track up to the last 100 acceptances
     ]}
   ]}
@@ -160,11 +160,11 @@ by declaring the overriden settings, per group, in the following fashion:
 
 Proper app. configuration reloads that result in calls to
 the application's internal `:config_change/3' callback will trigger
-a reload of settings in each of the relevant group processes.
+a reload of settings in each of the relevant category processes.
 
 ==== Dynamic Configuration ====
 
-The configuration of specific groups can be tweaked in runtime
+The configuration of specific categories can be tweaked in runtime
 by calling `aequitas:configure/2', e.g.:
 
 <pre lang="erlang" class="erlang">
@@ -173,9 +173,9 @@ ok = aequitas:configure(http_requests,
 </pre>
 
 (Re)configuration performed this way will override the
-static group configuration present in `app.config', if any.
+static category configuration present in `app.config', if any.
 
-It will also trigger a reload of settings in the relevant group process.
+It will also trigger a reload of settings in the relevant category process.
 
 === License ===
 

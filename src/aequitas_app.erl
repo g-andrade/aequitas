@@ -51,16 +51,16 @@ stop(_State) ->
 -spec config_change([{term(), term()}], [{term(), term()}], [term()]) -> ok.
 config_change(Changed, New, Removed) ->
     lists:foreach(
-      fun ({{group, Group}, _SettingOpts}) when is_atom(Group) ->
-              aequitas_group:async_reload_settings(Group);
+      fun ({{category, Category}, _SettingOpts}) when is_atom(Category) ->
+              aequitas_category:async_reload_settings(Category);
           ({_, _}) ->
               ok
       end,
       Changed ++ New),
 
     lists:foreach(
-      fun ({group, Group}) when is_atom(Group) ->
-              aequitas_group:async_reload_settings(Group);
+      fun ({category, Category}) when is_atom(Category) ->
+              aequitas_category:async_reload_settings(Category);
           (_) ->
               ok
       end,

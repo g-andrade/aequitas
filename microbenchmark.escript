@@ -4,17 +4,17 @@
 -export([main/1]).
 
 main([]) ->
-    Group = microbenchmarking,
+    Category = microbenchmarking,
     NrOfWorkers = 100,
     NrOfCalls = 2000000,
     {ok, _} = application:ensure_all_started(aequitas),
     {ok, _} = application:ensure_all_started(sasl),
-    do_it(Group, NrOfWorkers, NrOfCalls).
+    do_it(Category, NrOfWorkers, NrOfCalls).
 
-do_it(Group, NrOfWorkers, NrOfCalls) ->
+do_it(Category, NrOfWorkers, NrOfCalls) ->
     NrOfCallsPerWorker = NrOfCalls div NrOfWorkers,
     Parent = self(),
-    Pids = [spawn(fun () -> run_worker(Group, Nr, Parent, NrOfCallsPerWorker) end)
+    Pids = [spawn(fun () -> run_worker(Category, Nr, Parent, NrOfCallsPerWorker) end)
             || Nr <- lists:seq(1, NrOfWorkers)],
     WithMonitors = [{Pid, monitor(process, Pid)} || Pid <- Pids],
     io:format("running benchmarks... (~p calls using ~p workers)",
@@ -36,14 +36,14 @@ wait_for_workers(WithMonitors, ResultAcc) ->
             error(Reason)
     end.
 
-run_worker(Group, Nr, Parent, NrOfCalls) ->
-    run_worker_loop(Group, Nr, Parent, NrOfCalls, erlang:monotonic_time(milli_seconds), 0).
+run_worker(Category, Nr, Parent, NrOfCalls) ->
+    run_worker_loop(Category, Nr, Parent, NrOfCalls, erlang:monotonic_time(milli_seconds), 0).
 
-run_worker_loop(_Group, _Nr, Parent, NrOfCalls, StartTs, Count) when Count =:= NrOfCalls ->
+run_worker_loop(_Category, _Nr, Parent, NrOfCalls, StartTs, Count) when Count =:= NrOfCalls ->
     EndTs = erlang:monotonic_time(milli_seconds),
     TimeElapsed = EndTs - StartTs,
     PerSecond = (Count / (TimeElapsed / 1000)),
     Parent ! {worker_result, self(), PerSecond};
-run_worker_loop(Group, Nr, Parent, NrOfCalls, StartTs, Count) ->
-    _ = aequitas:ask(Group, Nr),
-    run_worker_loop(Group, Nr, Parent, NrOfCalls, StartTs, Count + 1).
+run_worker_loop(Category, Nr, Parent, NrOfCalls, StartTs, Count) ->
+    _ = aequitas:ask(Category, Nr),
+    run_worker_loop(Category, Nr, Parent, NrOfCalls, StartTs, Count + 1).
