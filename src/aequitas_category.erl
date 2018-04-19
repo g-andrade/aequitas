@@ -464,7 +464,8 @@ handle_ask(ActorId, Params, State) ->
         true ->
             {rejected, State};
         false ->
-            {accept, accept(ActorId, Params, State)}
+            UpdatedState = accept(ActorId, Params, State),
+            {accepted, UpdatedState}
     end.
 
 current_work_share(ActorId, State) ->
