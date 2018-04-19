@@ -64,7 +64,7 @@ group_params(Group) ->
     [{nr_of_actors, match_suffixed_param(Tokens, "actors")},
      {nr_of_requests_mean, match_suffixed_param(Tokens, "mean")},
      {nr_of_requests_stddev, match_suffixed_param(Tokens, "dev")},
-     {max_zscore_range, {-5, 5}}
+     {iqr_multiplier_range, {1, 3}}
     ].
 
 match_suffixed_param([H|T], Suffix) ->
@@ -92,7 +92,7 @@ init_per_testcase(TestCase, Config) ->
 %% Definition
 %% ------------------------------------------------------------------
 
-correct_zscore_enforcement_test(Config) ->
+correct_iqr_enforcement_test(Config) ->
     NrOfActors = proplists:get_value(nr_of_actors, Config),
     NrOfRequestsMean = proplists:get_value(nr_of_requests_mean, Config),
     NrOfRequestsStdDev = proplists:get_value(nr_of_requests_stddev, Config),
@@ -106,66 +106,46 @@ correct_zscore_enforcement_test(Config) ->
           [], lists:seq(1, NrOfActors)),
     ShuffledActorRequests =
         lists_shuffle(ActorRequests),
-    correct_zscore_enforcement_test(ShuffledActorRequests, Config, #{}).
+    correct_iqr_enforcement_test(ShuffledActorRequests, Config, #{}).
 
 %% ------------------------------------------------------------------
 %% Internal
 %% ------------------------------------------------------------------
 
-correct_zscore_enforcement_test([Actor | NextActors], Config, AcceptancesPerActor) ->
+correct_iqr_enforcement_test([Actor | NextActors], Config, WorkShares) ->
     Category = proplists:get_value(category, Config),
-    {MinMaxZScore, MaxMaxZScore} = proplists:get_value(max_zscore_range, Config),
-    MaxZScore = MinMaxZScore + (rand:uniform(MaxMaxZScore - MinMaxZScore) - 1),
-    AskOpts = [{max_zscore, MaxZScore}],
+    {MinIQRMultiplier, MaxIQRMultiplier} = proplists:get_value(iqr_multiplier_range, Config),
+    IQRMultiplier = MinIQRMultiplier + (rand:uniform() * MaxIQRMultiplier - MinIQRMultiplier),
+    AskOpts = [{iqr_multiplier, IQRMultiplier}, return_stats],
 
-    ExpectedAskResult = expected_ask_result(Actor, MaxZScore, AcceptancesPerActor),
-    AskResult = aequitas:ask(Category, Actor, AskOpts),
+    {AskResult, Stats} = aequitas:ask(Category, Actor, AskOpts),
+    ExpectedAskResult = expected_ask_result(Actor, IQRMultiplier, WorkShares, Stats),
     ?assertEqual(ExpectedAskResult, AskResult),
 
-    UpdatedAcceptancesPerActor =
+    UpdatedWorkShares =
         case AskResult of
             accepted ->
-                WorkShare = maps:get(Actor, AcceptancesPerActor, 0),
-                AcceptancesPerActor#{ Actor => WorkShare + 1 };
+                WorkShare = maps:get(Actor, WorkShares, 0),
+                WorkShares#{ Actor => WorkShare + 1 };
             rejected ->
-                AcceptancesPerActor
+                WorkShares
         end,
-    correct_zscore_enforcement_test(NextActors, Config, UpdatedAcceptancesPerActor);
-correct_zscore_enforcement_test([], _Config, _AcceptancesPerActor) ->
+    correct_iqr_enforcement_test(NextActors, Config, UpdatedWorkShares);
+correct_iqr_enforcement_test([], _Config, _WorkShares) ->
     ok.
 
-expected_ask_result(Actor, MaxZScore, AcceptancesPerActor) ->
-    ZScore = zscore(Actor, AcceptancesPerActor),
-    case ZScore > MaxZScore of
-        true -> rejected;
-        false -> accepted
+expected_ask_result(Actor, IQRMultiplier, WorkShares, Stats) ->
+    case Stats of
+        #{ q3 := Q3, iqr := IQR } ->
+           WorkShare = maps:get(Actor, WorkShares, 0),
+           WorkLimit = Q3 + (IQR * IQRMultiplier),
+           case WorkShare > WorkLimit of
+               true -> rejected;
+               false -> accepted
+           end;
+        #{} ->
+            accepted
     end.
-
-zscore(Actor, AcceptancesPerActor) ->
-    {Mean, StdDeviation} = work_stats(AcceptancesPerActor),
-    case StdDeviation == 0 of
-        true -> 0;
-        false ->
-            Acceptances = maps:get(Actor, AcceptancesPerActor, 0),
-            (Acceptances - Mean) / StdDeviation
-    end.
-
-work_stats(AcceptancesPerActor) when map_size(AcceptancesPerActor) =:= 0 ->
-    {0, 0};
-work_stats(AcceptancesPerActor) ->
-    {Sum, SquaredSum} =
-        maps:fold(
-          fun (_Actor, Acceptances, {SumAcc, SquaredSumAcc}) ->
-                  {SumAcc + Acceptances,
-                   SquaredSumAcc + (Acceptances * Acceptances)}
-          end,
-          {0, 0}, AcceptancesPerActor),
-
-    N = map_size(AcceptancesPerActor),
-    Mean = Sum / N,
-    Variance = (SquaredSum / N) - (Mean * Mean),
-    StdDeviation = math:sqrt(Variance),
-    {Mean, StdDeviation}.
 
 lists_shuffle(List) ->
     WithTags = [{V, rand:uniform()} || V <- List],

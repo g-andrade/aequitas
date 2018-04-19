@@ -72,8 +72,8 @@ init([]) ->
         [#{ id => cfg,
             start => {aequitas_cfg, start_link, []}
           },
-         #{ id => cruncher_sup,
-            start => {aequitas_cruncher_sup, start_link, []},
+         #{ id => work_stats_sup,
+            start => {aequitas_work_stats_sup, start_link, []},
             type => supervisor
           },
          #{ id => category_sup,

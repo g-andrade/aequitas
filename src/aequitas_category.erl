@@ -77,6 +77,7 @@
 
 -define(DEFAULT_WORK_WEIGHT, 1).
 -define(DEFAULT_IQR_MULTIPLIER, 1.5).
+-define(DEFAULT_RETURN_STATS, false).
 
 -define(is_pos_integer(V), (is_integer((V)) andalso ((V) > 0))).
 -define(is_non_neg_number(V), (is_number((V)) andalso ((V) >= 0))).
@@ -107,16 +108,17 @@
           %%
           work_shares :: #{ term() => pos_integer() }, % work share per actor
           work_stats_status :: updated | outdated | updating,
-          work_stats :: aequitas_cruncher:work_stats(),
+          work_stats :: aequitas_work_stats:t(),
           %%
-          cruncher_pid :: pid(),
-          cruncher_mon :: reference()
+          work_stats_pid :: pid(),
+          work_stats_mon :: reference()
          }).
 -type state() :: #state{}.
 
 -record(ask_params, {
           weight :: pos_integer(),
-          iqr_multiplier :: number()
+          iqr_multiplier :: number(),
+          return_stats :: boolean()
          }).
 
 -type setting_opt() ::
@@ -126,7 +128,8 @@
 
 -type ask_opt() ::
         {weight, pos_integer()} |
-        {iqr_multiplier, number()}.
+        {iqr_multiplier, number()} |
+        return_stats.
 -export_type([ask_opt/0]).
 
 %%-------------------------------------------------------------------
@@ -138,7 +141,9 @@
 start_link(Category) ->
     proc_lib:start_link(?MODULE, init, [{self(), [Category]}]).
 
--spec ask(atom() | pid(), term(), [ask_opt()]) -> accepted | rejected.
+-spec ask(atom() | pid(), term(), [ask_opt()]) -> Status | {Status, Stats}
+             when Status :: accepted | rejected,
+                  Stats :: aequitas_work_stats:t().
 %% @private
 ask(Category, ActorId, Opts) when is_atom(Category) ->
     Pid = ensure_server(Category),
@@ -184,7 +189,7 @@ async_reload_settings(Category) when is_atom(Category) ->
     Pid = ensure_server(Category),
     send_cast(Pid, reload_settings).
 
--spec report_work_stats(pid(), aequitas_cruncher:work_stats()) -> ok.
+-spec report_work_stats(pid(), aequitas_work_stats:t()) -> ok.
 %% @private
 report_work_stats(Pid, WorkStats) ->
     send_cast(Pid, {report_work_stats, WorkStats}).
@@ -201,7 +206,7 @@ init({Parent, [Category]}) ->
     try register(Server, self()) of
         true ->
             Settings = load_settings(Category),
-            {ok, CruncherPid} = aequitas_cruncher:start(self()),
+            {ok, WorkStatsPid} = aequitas_work_stats:start(self()),
             proc_lib:init_ack(Parent, {ok, self()}),
             State =
                 #state{
@@ -212,8 +217,8 @@ init({Parent, [Category]}) ->
                    work_shares = #{},
                    work_stats_status = updated,
                    work_stats = #{ nr_of_samples => 0 },
-                   cruncher_pid = CruncherPid,
-                   cruncher_mon = monitor(process, CruncherPid)
+                   work_stats_pid = WorkStatsPid,
+                   work_stats_mon = monitor(process, WorkStatsPid)
                   },
             loop(Parent, Debug, State)
     catch
@@ -329,9 +334,9 @@ wait_call_reply(Tag, Mon) ->
 %%-------------------------------------------------------------------
 
 loop(Parent, Debug, State) when State#state.work_stats_status =:= outdated ->
-    CruncherPid = State#state.cruncher_pid,
+    WorkStatsPid = State#state.work_stats_pid,
     WorkShares = State#state.work_shares,
-    aequitas_cruncher:generate_work_stats(CruncherPid, WorkShares),
+    aequitas_work_stats:generate_work_stats(WorkStatsPid, WorkShares),
     UpdatedState = set_work_stats_status(updating, State),
     loop(Parent, Debug, UpdatedState);
 loop(Parent, Debug, State) ->
@@ -441,7 +446,8 @@ parse_ask_opts(Opts) ->
     DefaultParams =
         #ask_params{
            weight = ?DEFAULT_WORK_WEIGHT,
-           iqr_multiplier = ?DEFAULT_IQR_MULTIPLIER
+           iqr_multiplier = ?DEFAULT_IQR_MULTIPLIER,
+           return_stats = ?DEFAULT_RETURN_STATS
           },
     parse_ask_opts(Opts, DefaultParams).
 
@@ -451,6 +457,8 @@ parse_ask_opts([{weight, Weight} | Next], Acc)
 parse_ask_opts([{iqr_multiplier, IQRMultiplier} | Next], Acc)
   when ?is_non_neg_number(IQRMultiplier) ->
     parse_ask_opts(Next, Acc#ask_params{ iqr_multiplier = IQRMultiplier });
+parse_ask_opts([return_stats | Next], Acc) ->
+    parse_ask_opts(Next, Acc#ask_params{ return_stats = true });
 parse_ask_opts([], Acc) ->
     Acc;
 parse_ask_opts(InvalidOpts, _Acc) ->
@@ -462,10 +470,18 @@ handle_ask(ActorId, Params, State) ->
     WorkLimit = work_limit(IQRMultiplier, State),
     case CurrentWorkShare > WorkLimit of
         true ->
-            {rejected, State};
-        false ->
+            maybe_return_stats_in_ask(Params, rejected, State);
+        _ ->
             UpdatedState = accept(ActorId, Params, State),
-            {accepted, UpdatedState}
+            maybe_return_stats_in_ask(Params, accepted, UpdatedState)
+    end.
+
+maybe_return_stats_in_ask(Params, Status, State) ->
+    case Params#ask_params.return_stats of
+        true ->
+            {{Status, State#state.work_stats}, State};
+        _ ->
+            {Status, State}
     end.
 
 current_work_share(ActorId, State) ->

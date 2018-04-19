@@ -19,7 +19,7 @@
 %% DEALINGS IN THE SOFTWARE.
 
 %% @private
--module(aequitas_cruncher_sup).
+-module(aequitas_work_stats_sup).
 -behaviour(supervisor).
 
 %% ------------------------------------------------------------------
@@ -64,7 +64,7 @@ start_child(Args) ->
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([]) -> {ok, {supervisor:sup_flags(), 
+-spec init([]) -> {ok, {supervisor:sup_flags(),
                         [supervisor:child_spec(), ...]}}.
 init([]) ->
     SupFlags =
@@ -73,8 +73,8 @@ init([]) ->
            period => 1
          },
     ChildSpecs =
-        [#{ id => cruncher,
-            start => {aequitas_cruncher, start_link, []},
+        [#{ id => work_stats,
+            start => {aequitas_work_stats, start_link, []},
             restart => temporary
           }
         ],

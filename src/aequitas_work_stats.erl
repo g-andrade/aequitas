@@ -18,8 +18,7 @@
 %% FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 %% DEALINGS IN THE SOFTWARE.
 
-%% @private
--module(aequitas_cruncher).
+-module(aequitas_work_stats).
 
 % https://gist.github.com/marcelog/97708058cd17f86326c82970a7f81d40#file-simpleproc-erl
 
@@ -67,30 +66,33 @@
          }).
 -type state() :: #state{}.
 
--type work_stats() ::
+-type t() ::
         #{ nr_of_samples => non_neg_integer(),
            q1 => number(),
            q2 => number(),
            q3 => number(),
            iqr => number()
          }.
--export_type([work_stats/0]).
+-export_type([t/0]).
 
 %%-------------------------------------------------------------------
 %% API Function Definitions
 %%-------------------------------------------------------------------
 
 -spec start_link(pid()) -> {ok, pid()}.
+%% @private
 start_link(CategoryPid) ->
     proc_lib:start_link(?MODULE, init, [{self(), [CategoryPid]}]).
 
 -spec start(pid()) -> {ok, pid()}.
+%% @private
 start(CategoryPid) ->
-    aequitas_cruncher_sup:start_child([CategoryPid]).
+    aequitas_work_stats_sup:start_child([CategoryPid]).
 
 -spec generate_work_stats(pid(), #{ term() => pos_integer() }) -> ok.
-generate_work_stats(CruncherPid, WorkShares) ->
-    CruncherPid ! {generate_work_stats, WorkShares},
+%% @private
+generate_work_stats(WorkStatsPid, WorkShares) ->
+    WorkStatsPid ! {generate_work_stats, WorkShares},
     ok.
 
 %%-------------------------------------------------------------------
@@ -98,6 +100,7 @@ generate_work_stats(CruncherPid, WorkShares) ->
 %%-------------------------------------------------------------------
 
 -spec init({pid(), [pid(), ...]}) -> no_return().
+%% @private
 init({Parent, [CategoryPid]}) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     Debug = sys:debug_options([]),
@@ -109,21 +112,25 @@ init({Parent, [CategoryPid]}) ->
     loop(Parent, Debug, State).
 
 -spec write_debug(io:device(), term(), term()) -> ok.
+%% @private
 write_debug(Dev, Event, Name) ->
     % called by sys:handle_debug().
     io:format(Dev, "~p event = ~p~n", [Name, Event]).
 
 -spec system_continue(pid(), [sys:debug_opt()], state()) -> no_return().
+%% @private
 system_continue(Parent, Debug, State) ->
     % http://www.erlang.org/doc/man/sys.html#Mod:system_continue-3
     loop(Parent, Debug, State).
 
 -spec system_terminate(term(), pid(), [sys:debug_opt()], state()) -> no_return().
+%% @private
 system_terminate(Reason, _Parent, _Debug, _State) ->
     % http://www.erlang.org/doc/man/sys.html#Mod:system_terminate-4
     exit(Reason).
 
 -spec system_code_change(state(), ?MODULE, term(), term()) -> {ok, state()}.
+%% @private
 %% http://www.erlang.org/doc/man/sys.html#Mod:system_code_change-4
 system_code_change(State, _Module, _OldVsn, _Extra) ->
     {ok, State}.

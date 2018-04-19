@@ -48,10 +48,11 @@
 %% @see ask/3
 %% @see async_ask/3
 %% @see async_ask/2
--spec ask(Category, ActorId)
-        -> accepted | rejected
+-spec ask(Category, ActorId) -> Status | {Status, Stats}
     when Category :: atom(),
-         ActorId :: term().
+         ActorId :: term(),
+         Status :: accepted | rejected,
+         Stats :: aequitas_work_stats:t().
 ask(Category, ActorId) ->
     ask(Category, ActorId, []).
 
@@ -71,11 +72,12 @@ ask(Category, ActorId) ->
 %% @see ask/2
 %% @see async_ask/3
 %% @see async_ask/2
--spec ask(Category, ActorId, Opts)
-        -> accepted | rejected
+-spec ask(Category, ActorId, Opts) -> Status | {Status, Stats}
     when Category :: atom(),
          ActorId :: term(),
-         Opts :: [aequitas_category:ask_opt()].
+         Opts :: [aequitas_category:ask_opt()],
+         Status :: accepted | rejected,
+         Stats :: aequitas_work_stats:t().
 ask(Category, ActorId, Opts) ->
     aequitas_category:ask(Category, ActorId, Opts).
 
