@@ -40,7 +40,6 @@
     async_ask/3,
     set_settings/2,
     validate_settings/1,
-    reload_settings/1,
     async_reload_settings/1,
     report_work_stats/2
    ]).
@@ -179,13 +178,6 @@ validate_settings(SettingOpts) ->
             {error, Reason}
     end.
 
--spec reload_settings(atom()) -> ok.
-%% @private
-reload_settings(Category) when is_atom(Category) ->
-    Pid = ensure_server(Category),
-    {Tag, Mon} = send_call(Pid, reload_settings),
-    wait_call_reply(Tag, Mon).
-
 -spec async_reload_settings(atom()) -> ok.
 %% @private
 async_reload_settings(Category) when is_atom(Category) ->
@@ -270,6 +262,13 @@ ensure_server(Category) ->
         Pid ->
             Pid
     end.
+
+-spec reload_settings(atom()) -> ok.
+%% @private
+reload_settings(Category) when is_atom(Category) ->
+    Pid = ensure_server(Category),
+    {Tag, Mon} = send_call(Pid, reload_settings),
+    wait_call_reply(Tag, Mon).
 
 server_name(Category) ->
     list_to_atom(
