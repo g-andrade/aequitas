@@ -23,6 +23,8 @@
 %% @reference <a target="_parent" href="https://www.itl.nist.gov/div898/handbook/eda/section3/eda35h.htm">Detection of Outliers</a> (Wikipedia)
 %% @reference <a target="_parent" href="https://en.wikipedia.org/wiki/Robust_measures_of_scale">Robust measures of scale</a> (Wikipedia)
 %% @reference <a target="_parent" href="https://pkghosh.wordpress.com/2015/08/25/anomaly-detection-with-robust-zscore/">Anomaly Detection with Robust Zscore</a> (pkghosh.wordpress.com)
+%% @reference <a target="_parent" href="https://colingorrie.github.io/outlier-detection.html">Three ways to detect outliers</a> (colingorrie.github.io)
+%% @reference <a target="_parent" href="https://en.wikipedia.org/wiki/Interquartile_range">Interquartile range</a> (Wikipedia)
 
 -module(aequitas_category).
 
@@ -39,7 +41,8 @@
     set_settings/2,
     validate_settings/1,
     reload_settings/1,
-    async_reload_settings/1
+    async_reload_settings/1,
+    report_work_stats/2
    ]).
 
 -ignore_xref(
@@ -74,9 +77,10 @@
 -define(DEFAULT_MAX_WINDOW_DURATION, 5000).
 
 -define(DEFAULT_WORK_WEIGHT, 1).
--define(DEFAULT_MAX_ZSCORE, 3).
+-define(DEFAULT_IQR_MULTIPLIER, 1.5).
 
 -define(is_pos_integer(V), (is_integer((V)) andalso ((V) > 0))).
+-define(is_non_neg_number(V), (is_number((V)) andalso ((V) >= 0))).
 
 %%-------------------------------------------------------------------
 %% Record and Type Definitions
@@ -95,14 +99,6 @@
          }).
 -type work() :: #work{}.
 
--record(work_stats, {
-          sum = 0 :: non_neg_integer(), % used to calculate mean
-          squared_sum = 0 :: non_neg_integer(), % used to calculate stddev
-          mean = 0.0 :: float(), % used to calculate stddev and z-score
-          stddev = 0.0 :: float() % used to calculate z-score
-         }).
--type work_stats() :: #work_stats{}.
-
 -record(state, {
           category :: atom(), % the category identifier
           settings :: settings(), % the category settings
@@ -111,13 +107,17 @@
           window_size :: non_neg_integer(), % queue:len/1 is expensive
           %%
           work_shares :: #{ term() => pos_integer() }, % work share per actor
-          work_stats :: work_stats() % used to calculate z-score
+          work_stats_status :: updated | outdated | updating,
+          work_stats :: aequitas_cruncher:work_stats(),
+          %%
+          cruncher_pid :: pid(),
+          cruncher_mon :: reference()
          }).
 -type state() :: #state{}.
 
 -record(ask_params, {
           weight :: pos_integer(),
-          max_zscore :: number() | infinity
+          iqr_multiplier :: number()
          }).
 
 -type setting_opt() ::
@@ -127,7 +127,7 @@
 
 -type ask_opt() ::
         {weight, pos_integer()} |
-        {max_zscore, number() | infinity}.
+        {iqr_multiplier, number()}.
 -export_type([ask_opt/0]).
 
 %%-------------------------------------------------------------------
@@ -192,6 +192,11 @@ async_reload_settings(Category) when is_atom(Category) ->
     Pid = ensure_server(Category),
     send_cast(Pid, reload_settings).
 
+-spec report_work_stats(pid(), aequitas_cruncher:work_stats()) -> ok.
+%% @private
+report_work_stats(Pid, WorkStats) ->
+    send_cast(Pid, {report_work_stats, WorkStats}).
+
 %%-------------------------------------------------------------------
 %% OTP Function Definitions
 %%-------------------------------------------------------------------
@@ -204,6 +209,7 @@ init({Parent, [Category]}) ->
     try register(Server, self()) of
         true ->
             Settings = load_settings(Category),
+            {ok, CruncherPid} = aequitas_cruncher:start(self()),
             proc_lib:init_ack(Parent, {ok, self()}),
             State =
                 #state{
@@ -212,7 +218,10 @@ init({Parent, [Category]}) ->
                    window = queue:new(),
                    window_size = 0,
                    work_shares = #{},
-                   work_stats = #work_stats{}
+                   work_stats_status = updated,
+                   work_stats = #{ nr_of_samples => 0 },
+                   cruncher_pid = CruncherPid,
+                   cruncher_mon = monitor(process, CruncherPid)
                   },
             loop(Parent, Debug, State)
     catch
@@ -320,6 +329,12 @@ wait_call_reply(Tag, Mon) ->
 %% Internal Functions Definitions - Execution Loop
 %%-------------------------------------------------------------------
 
+loop(Parent, Debug, State) when State#state.work_stats_status =:= outdated ->
+    CruncherPid = State#state.cruncher_pid,
+    WorkShares = State#state.work_shares,
+    aequitas_cruncher:generate_work_stats(CruncherPid, WorkShares),
+    UpdatedState = set_work_stats_status(updating, State),
+    loop(Parent, Debug, UpdatedState);
 loop(Parent, Debug, State) ->
     case loop_action(State) of
         simple ->
@@ -378,16 +393,14 @@ loop_action(_Work, _Settings, _State) ->
 drop_work(Work, State) ->
     UpdatedWindow = queue:drop(State#state.window),
     UpdatedWindowSize = State#state.window_size - 1,
-    {PrevShare, UpdatedShare, UpdatedWorkShares} =
-        update_work_share(Work#work.actor_id, -Work#work.weight, State#state.work_shares),
-    UpdatedWorkStats =
-        update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, State#state.work_stats),
-    State#state{
-      window = UpdatedWindow,
-      window_size = UpdatedWindowSize,
-      work_shares = UpdatedWorkShares,
-      work_stats = UpdatedWorkStats
-     }.
+    UpdatedWorkShares = update_work_share(Work#work.actor_id, -Work#work.weight, State#state.work_shares),
+    UpdatedState =
+        State#state{
+          window = UpdatedWindow,
+          window_size = UpdatedWindowSize,
+          work_shares = UpdatedWorkShares
+         },
+    set_work_stats_status(outdated, UpdatedState).
 
 handle_msg({system, From, Request}, Parent, Debug, State) ->
     sys:handle_system_msg(Request, From, Parent, ?MODULE, Debug, State);
@@ -406,6 +419,10 @@ handle_nonsystem_msg({call, Pid, Tag, reload_settings}, Parent, Debug, State) ->
 handle_nonsystem_msg({cast, reload_settings}, Parent, Debug, State) ->
     UpdatedState = handle_settings_reload(State),
     loop(Parent, Debug, UpdatedState);
+handle_nonsystem_msg({cast, {report_work_stats, WorkStats}}, Parent, Debug, State) ->
+    State2 = State#state{ work_stats = WorkStats },
+    State3 = set_work_stats_status(updated, State2),
+    loop(Parent, Debug, State3);
 handle_nonsystem_msg(Msg, _Parent, _Debug, _State) ->
     error({unexpected_msg, Msg}).
 
@@ -425,29 +442,42 @@ parse_ask_opts(Opts) ->
     DefaultParams =
         #ask_params{
            weight = ?DEFAULT_WORK_WEIGHT,
-           max_zscore = ?DEFAULT_MAX_ZSCORE
+           iqr_multiplier = ?DEFAULT_IQR_MULTIPLIER
           },
     parse_ask_opts(Opts, DefaultParams).
 
 parse_ask_opts([{weight, Weight} | Next], Acc)
   when ?is_pos_integer(Weight) ->
     parse_ask_opts(Next, Acc#ask_params{ weight = Weight });
-parse_ask_opts([{max_zscore, MaxZScore} | Next], Acc)
-  when is_number(MaxZScore); MaxZScore =:= infinity ->
-    parse_ask_opts(Next, Acc#ask_params{ max_zscore = MaxZScore });
+parse_ask_opts([{iqr_multiplier, IQRMultiplier} | Next], Acc)
+  when ?is_non_neg_number(IQRMultiplier) ->
+    parse_ask_opts(Next, Acc#ask_params{ iqr_multiplier = IQRMultiplier });
 parse_ask_opts([], Acc) ->
     Acc;
 parse_ask_opts(InvalidOpts, _Acc) ->
     error({badarg, InvalidOpts}).
 
 handle_ask(ActorId, Params, State) ->
-    ZScore = zscore(ActorId, State),
-    case ZScore =< Params#ask_params.max_zscore of
+    IQRMultiplier = Params#ask_params.iqr_multiplier,
+    CurrentWorkShare = current_work_share(ActorId, State),
+    WorkLimit = work_limit(IQRMultiplier, State),
+    case CurrentWorkShare > WorkLimit of
         true ->
-            UpdatedState = accept(ActorId, Params, State),
-            {accepted, UpdatedState};
-        _ ->
-            {rejected, State}
+            {rejected, State};
+        false ->
+            {accept, accept(ActorId, Params, State)}
+    end.
+
+current_work_share(ActorId, State) ->
+    maps:get(ActorId, State#state.work_shares, 0).
+
+work_limit(IQRMultiplier, State) ->
+    case State#state.work_stats of
+        #{ q3 := Q3, iqr := IQR } ->
+            Q3 + (IQR * IQRMultiplier);
+        #{} ->
+            % not enough samples
+            infinity
     end.
 
 accept(ActorId, Params, State)
@@ -465,64 +495,40 @@ accept(ActorId, Params, State) ->
 
     UpdatedWindow = queue:in(Work, State#state.window),
     UpdatedWindowSize = State#state.window_size + 1,
-    {PrevShare, UpdatedShare, UpdatedWorkShares} =
+    UpdatedWorkShares =
         update_work_share(Work#work.actor_id, Params#ask_params.weight, State#state.work_shares),
-    UpdatedWorkStats =
-        update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, State#state.work_stats),
-    State#state{
-      window = UpdatedWindow,
-      window_size = UpdatedWindowSize,
-      work_shares = UpdatedWorkShares,
-      work_stats = UpdatedWorkStats
-     }.
+    UpdatedState =
+        State#state{
+          window = UpdatedWindow,
+          window_size = UpdatedWindowSize,
+          work_shares = UpdatedWorkShares
+         },
+    set_work_stats_status(outdated, UpdatedState).
 
 update_work_share(ActorId, ShareIncr, WorkShares) ->
     ShareLookup = maps:find(ActorId, WorkShares),
     update_work_share(ActorId, ShareLookup, ShareIncr, WorkShares).
 
 update_work_share(ActorId, {ok, Share}, ShareIncr, WorkShares) ->
-    update_existing_work_share(ActorId, Share, Share + ShareIncr, WorkShares);
+    update_existing_work_share(ActorId, Share + ShareIncr, WorkShares);
 update_work_share(ActorId, error, ShareIncr, WorkShares) ->
-    UpdatedWorkShares = maps:put(ActorId, ShareIncr, WorkShares),
-    {0, ShareIncr, UpdatedWorkShares}.
+    maps:put(ActorId, ShareIncr, WorkShares).
 
-update_existing_work_share(ActorId, Share, UpdatedShare, WorkShares) when UpdatedShare =:= 0 ->
-    UpdatedWorkShares = maps:remove(ActorId, WorkShares),
-    {Share, UpdatedShare, UpdatedWorkShares};
-update_existing_work_share(ActorId, Share, UpdatedShare, WorkShares) ->
-    UpdatedWorkShares = maps:update(ActorId, UpdatedShare, WorkShares),
-    {Share, UpdatedShare, UpdatedWorkShares}.
+update_existing_work_share(ActorId, UpdatedShare, WorkShares) when UpdatedShare =:= 0 ->
+    maps:remove(ActorId, WorkShares);
+update_existing_work_share(ActorId, UpdatedShare, WorkShares) ->
+    maps:update(ActorId, UpdatedShare, WorkShares).
 
-update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, WorkStats) ->
-    UpdatedWorkSharesSize = maps:size(UpdatedWorkShares),
-    case UpdatedWorkSharesSize =:= 0 of
-        true ->
-            #work_stats{};
-        _ ->
-            UpdatedSum = WorkStats#work_stats.sum - PrevShare + UpdatedShare,
-            UpdatedSquaredSum = (WorkStats#work_stats.squared_sum
-                                 - (PrevShare * PrevShare)
-                                 + (UpdatedShare * UpdatedShare)),
-            UpdatedMean = UpdatedSum / UpdatedWorkSharesSize,
-            UpdatedVariance = ((UpdatedSquaredSum / UpdatedWorkSharesSize)
-                               - (UpdatedMean * UpdatedMean)),
-            UpdatedStdDev = math:sqrt(UpdatedVariance),
-            #work_stats{
-               sum = UpdatedSum,
-               squared_sum = UpdatedSquaredSum,
-               mean = UpdatedMean,
-               stddev = UpdatedStdDev
-              }
-    end.
-
-zscore(ActorId, State) ->
-    % Standard score / Z-score:
-    % https://en.wikipedia.org/wiki/Standard_score
-    WorkStats = State#state.work_stats,
-    case WorkStats#work_stats.stddev of
-        0.0 ->
-            0.0;
-        StdDev ->
-            WorkShare = maps:get(ActorId, State#state.work_shares, 0),
-            (WorkShare - WorkStats#work_stats.mean) / StdDev
+set_work_stats_status(Status, State) ->
+    case {State#state.work_stats_status, Status} of
+        {Same, Same} ->
+            State;
+        {updated, outdated} ->
+            State#state{ work_stats_status = outdated };
+        {outdated, updating} ->
+            State#state{ work_stats_status = updating };
+        {updating, updated} ->
+            State#state{ work_stats_status = updated };
+        {updating, outdated} ->
+            State
     end.
