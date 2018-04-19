@@ -95,21 +95,11 @@
          }).
 -type work() :: #work{}.
 
--record(work_quartiles, {
-          tree = aequitas_quartiles:empty(),
-          %gb_sets:new() :: gb_sets:set({pos_integer(), term()}), % work share per actor
-          q2 :: undefined | {pos_integer(), term()},
-          q1 :: undefined | {pos_integer(), term()},
-          q3 :: undefined | {pos_integer(), term()}
-         }).
--type work_quartiles() :: #work_quartiles{}.
-
 -record(work_stats, {
           sum = 0 :: non_neg_integer(), % used to calculate mean
           squared_sum = 0 :: non_neg_integer(), % used to calculate stddev
           mean = 0.0 :: float(), % used to calculate stddev and z-score
-          stddev = 0.0 :: float(),% used to calculate z-score
-          quartiles = #work_quartiles{} :: work_quartiles()
+          stddev = 0.0 :: float() % used to calculate z-score
          }).
 -type work_stats() :: #work_stats{}.
 
@@ -391,8 +381,7 @@ drop_work(Work, State) ->
     {PrevShare, UpdatedShare, UpdatedWorkShares} =
         update_work_share(Work#work.actor_id, -Work#work.weight, State#state.work_shares),
     UpdatedWorkStats =
-        update_work_stats(Work#work.actor_id, PrevShare, UpdatedShare, UpdatedWorkShares,
-                          State#state.work_stats),
+        update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, State#state.work_stats),
     State#state{
       window = UpdatedWindow,
       window_size = UpdatedWindowSize,
@@ -479,8 +468,7 @@ accept(ActorId, Params, State) ->
     {PrevShare, UpdatedShare, UpdatedWorkShares} =
         update_work_share(Work#work.actor_id, Params#ask_params.weight, State#state.work_shares),
     UpdatedWorkStats =
-        update_work_stats(Work#work.actor_id, PrevShare, UpdatedShare, UpdatedWorkShares,
-                          State#state.work_stats),
+        update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, State#state.work_stats),
     State#state{
       window = UpdatedWindow,
       window_size = UpdatedWindowSize,
@@ -505,7 +493,7 @@ update_existing_work_share(ActorId, Share, UpdatedShare, WorkShares) ->
     UpdatedWorkShares = maps:update(ActorId, UpdatedShare, WorkShares),
     {Share, UpdatedShare, UpdatedWorkShares}.
 
-update_work_stats(ActorId, PrevShare, UpdatedShare, UpdatedWorkShares, WorkStats) ->
+update_work_stats(PrevShare, UpdatedShare, UpdatedWorkShares, WorkStats) ->
     UpdatedWorkSharesSize = maps:size(UpdatedWorkShares),
     case UpdatedWorkSharesSize =:= 0 of
         true ->
@@ -519,37 +507,13 @@ update_work_stats(ActorId, PrevShare, UpdatedShare, UpdatedWorkShares, WorkStats
             UpdatedVariance = ((UpdatedSquaredSum / UpdatedWorkSharesSize)
                                - (UpdatedMean * UpdatedMean)),
             UpdatedStdDev = math:sqrt(UpdatedVariance),
-            UpdatedQuartiles = update_work_quartiles(ActorId, PrevShare, UpdatedShare,
-                                                     WorkStats#work_stats.quartiles),
             #work_stats{
                sum = UpdatedSum,
                squared_sum = UpdatedSquaredSum,
                mean = UpdatedMean,
-               stddev = UpdatedStdDev,
-               quartiles = UpdatedQuartiles
+               stddev = UpdatedStdDev
               }
     end.
-
-update_work_quartiles(ActorId, PrevShare, UpdatedShare, Quartiles) ->
-    Tree = Quartiles#work_quartiles.tree,
-    Tree2 = update_work_tree(ActorId, PrevShare, UpdatedShare, Tree),
-    %Tree3 = gb_sets:balance(Tree2),
-    Quartiles#work_quartiles{ tree = Tree2 }.
-
-update_work_tree(ActorId, PrevShare, UpdatedShare, Tree) when PrevShare =:= 0 ->
-    % actor added
-    %gb_sets:add({UpdatedShare, ActorId}, Tree);
-    aequitas_quartiles:add({UpdatedShare, ActorId}, Tree);
-update_work_tree(ActorId, PrevShare, UpdatedShare, Tree) when UpdatedShare =:= 0 ->
-    % actor removed
-    %gb_sets:delete({PrevShare, ActorId}, Tree);
-    aequitas_quartiles:delete({PrevShare, ActorId}, Tree);
-update_work_tree(ActorId, PrevShare, UpdatedShare, Tree) ->
-    % actor updated
-    %Tree2 = gb_sets:delete({PrevShare, ActorId}, Tree),
-    Tree2 = aequitas_quartiles:delete({PrevShare, ActorId}, Tree),
-    %gb_sets:add({UpdatedShare, ActorId}, Tree2).
-    aequitas_quartiles:add({UpdatedShare, ActorId}, Tree2).
 
 zscore(ActorId, State) ->
     % Standard score / Z-score:
