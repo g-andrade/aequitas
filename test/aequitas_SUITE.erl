@@ -33,11 +33,12 @@ all() ->
 groups() ->
     [{Group, [parallel], test_cases()}
      || Group <- ['10actors_20mean_10dev',
-                  '100actors_20mean_10dev',
+                  '100actors_200mean_100dev',
                   '1000actors_20mean_10dev',
+                  '10000actors_3mean_0dev',
                   '10actors_100mean_20dev',
-                  '100actors_10mean_0dev',
-                  '100actors_0mean_0dev']].
+                  '100actors_10mean_0dev'
+                 ]].
 
 test_cases() ->
     ModuleInfo = ?MODULE:module_info(),
