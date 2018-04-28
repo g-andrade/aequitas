@@ -1,4 +1,4 @@
--module(aequitas_sup).
+-module(aequitas_directory_sup).
 -behaviour(supervisor).
 
 %% ------------------------------------------------------------------
@@ -33,17 +33,16 @@ start_link() ->
 
 init([]) ->
     SupFlags =
-        #{ strategy => rest_for_one,
-           intensity => 10,
+        #{ strategy => one_for_all,
+           intensity => 0,
            period => 1
          },
     Children =
-        [#{ id => directory_sup,
-            start => {aequitas_directory_sup, start_link, []},
-            type => supervisor
+        [#{ id => directory,
+            start => {aequitas_directory, start_link, []}
           },
-         #{ id => actor_sup,
-            start => {aequitas_actor_sup, start_link, []},
+         #{ id => directory_reg_sup,
+            start => {aequitas_directory_reg_sup, start_link, []},
             type => supervisor
           }
         ],

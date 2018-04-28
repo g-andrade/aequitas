@@ -1,11 +1,14 @@
--module(aequitas_sup).
+-module(aequitas_actor_sup).
 -behaviour(supervisor).
 
 %% ------------------------------------------------------------------
 %% API Function Exports
 %% ------------------------------------------------------------------
 
--export([start_link/0]).
+-export(
+   [start_link/0,
+    start_child/1
+   ]).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Exports
@@ -27,24 +30,23 @@
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?CB_MODULE, []).
 
+start_child(Args) ->
+    supervisor:start_child(?SERVER, Args).
+
 %% ------------------------------------------------------------------
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
 init([]) ->
     SupFlags =
-        #{ strategy => rest_for_one,
+        #{ strategy => simple_one_for_one,
            intensity => 10,
            period => 1
          },
     Children =
-        [#{ id => directory_sup,
-            start => {aequitas_directory_sup, start_link, []},
-            type => supervisor
-          },
-         #{ id => actor_sup,
-            start => {aequitas_actor_sup, start_link, []},
-            type => supervisor
+        [#{ id => actor,
+            start => {aequitas_actor, start_link, []},
+            restart => temporary
           }
         ],
     {ok, {SupFlags, Children}}.
