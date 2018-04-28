@@ -35,12 +35,6 @@
    ]).
 
 %%-------------------------------------------------------------------
-%% Macro Definitions
-%%-------------------------------------------------------------------
-
--define(SERVER, ?MODULE).
-
-%%-------------------------------------------------------------------
 %% Record and Type Definitions
 %%-------------------------------------------------------------------
 
@@ -72,7 +66,6 @@ start_link(Category) ->
 -spec init({pid(), [term(), ...]}) -> no_return().
 %% @private
 init({Parent, [Category]}) ->
-    register(?SERVER, self()),
     Debug = sys:debug_options([]),
     proc_lib:init_ack(Parent, {ok, self()}),
     BrokerPid = aequitas_categories_manager:ensure_broker(Category),
