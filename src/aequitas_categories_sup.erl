@@ -1,4 +1,4 @@
--module(aequitas_category_sup).
+-module(aequitas_categories_sup).
 -behaviour(supervisor).
 
 %% ------------------------------------------------------------------
@@ -6,8 +6,8 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [start_link/1,
-    start/1
+   [start_link/0,
+    start_child/1
    ]).
 
 %% ------------------------------------------------------------------
@@ -20,34 +20,34 @@
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
+-define(SERVER, ?MODULE).
 -define(CB_MODULE, ?MODULE).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-start_link(Category) ->
-    supervisor:start_link(?CB_MODULE, [Category]).
+start_link() ->
+    supervisor:start_link({local, ?SERVER}, ?CB_MODULE, []).
 
-start(Category) ->
-    aequitas_categories_sup:start_child([Category]).
+start_child(Args) ->
+    supervisor:start_child(?SERVER, Args).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
-init([Category]) ->
+init([]) ->
     SupFlags =
-        #{ strategy => rest_for_one,
+        #{ strategy => simple_one_for_one,
            intensity => 10,
            period => 1
          },
     Children =
-        [#{ id => category_broker,
-            start => {aequitas_category_broker, start_link, [Category]}
-          },
-         #{ id => category_regulator,
-            start => {aequitas_category_regulator, start_link, [Category]}
+        [#{ id => category_sup,
+            start => {aequitas_category_sup, start_link, []},
+            restart => temporary,
+            type => supervisor
           }
         ],
     {ok, {SupFlags, Children}}.

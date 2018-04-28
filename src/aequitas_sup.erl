@@ -69,15 +69,11 @@ init([]) ->
            period => 1
          },
     ChildSpecs =
-        [#{ id => cfg,
-            start => {aequitas_cfg, start_link, []}
+        [#{ id => categories_manager,
+            start => {aequitas_categories_manager, start_link, []}
           },
-         #{ id => work_stats_sup,
-            start => {aequitas_work_stats_sup, start_link, []},
-            type => supervisor
-          },
-         #{ id => category_sup,
-            start => {aequitas_category_sup, start_link, []},
+         #{ id => categories_sup,
+            start => {aequitas_categories_sup, start_link, []},
             type => supervisor
           }],
     {ok, {SupFlags, ChildSpecs}}.

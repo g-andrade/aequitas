@@ -78,8 +78,14 @@ ask(Category, ActorId) ->
          Opts :: [aequitas_category:ask_opt()],
          Status :: accepted | rejected,
          Stats :: aequitas_work_stats:t().
-ask(Category, ActorId, Opts) ->
-    aequitas_category:ask(Category, ActorId, Opts).
+ask(Category, ActorId, _Opts) ->
+    BrokerPid = aequitas_categories_manager:ensure_broker(Category),
+    case aequitas_category_broker:ask(BrokerPid, ActorId) of
+        {go, _Ref, _Value, _RelativeTime, _SojournTime} ->
+            accepted;
+        {drop, _SojournTime} ->
+            rejected
+    end.
 
 %% @doc Like `:async_ask/3' but with defaults options
 %% @see async_ask/3

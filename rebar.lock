@@ -1,1 +1,6 @@
-[].
+{"1.1.0",
+[{<<"sbroker">>,{pkg,<<"sbroker">>,<<"1.0.0">>},0}]}.
+[
+{pkg_hash,[
+ {<<"sbroker">>, <<"28FF1B5E58887C5098539F236307B36FE1D3EDAA2ACFF9D6A3D17C2DCAFEBBD0">>}]}
+].
