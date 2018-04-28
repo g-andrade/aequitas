@@ -6,3 +6,6 @@ build:
 
 run: build
 	mix run bench/bench.exs quickest html
+
+clean:
+	rm -rf mix.lock _build deps
