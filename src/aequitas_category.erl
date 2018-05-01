@@ -106,7 +106,7 @@
           window :: queue:queue(work()), % sliding window
           window_size :: non_neg_integer(), % queue:len/1 is expensive
           %%
-          work_shares :: #{ term() => pos_integer() }, % work share per actor
+          work_shares_table :: ets:tab(),
           work_stats_status :: updated | outdated | updating,
           work_stats :: aequitas_work_stats:t(),
           %%
@@ -206,7 +206,9 @@ init({Parent, [Category]}) ->
     try register(Server, self()) of
         true ->
             Settings = load_settings(Category),
-            {ok, WorkStatsPid} = aequitas_work_stats:start(self()),
+            WorkSharesTable = work_shares_table(Category),
+            _ = ets:new(WorkSharesTable, [named_table, protected]),
+            {ok, WorkStatsPid} = aequitas_work_stats:start(self(), WorkSharesTable),
             proc_lib:init_ack(Parent, {ok, self()}),
             State =
                 #state{
@@ -214,7 +216,7 @@ init({Parent, [Category]}) ->
                    settings = Settings,
                    window = queue:new(),
                    window_size = 0,
-                   work_shares = #{},
+                   work_shares_table = WorkSharesTable,
                    work_stats_status = updated,
                    work_stats = #{ nr_of_samples => 0 },
                    work_stats_pid = WorkStatsPid,
@@ -335,8 +337,7 @@ wait_call_reply(Tag, Mon) ->
 
 loop(Parent, Debug, State) when State#state.work_stats_status =:= outdated ->
     WorkStatsPid = State#state.work_stats_pid,
-    WorkShares = State#state.work_shares,
-    aequitas_work_stats:generate_work_stats(WorkStatsPid, WorkShares),
+    aequitas_work_stats:generate_work_stats(WorkStatsPid),
     UpdatedState = set_work_stats_status(updating, State),
     loop(Parent, Debug, UpdatedState);
 loop(Parent, Debug, State) ->
@@ -397,12 +398,11 @@ loop_action(_Work, _Settings, _State) ->
 drop_work(Work, State) ->
     UpdatedWindow = queue:drop(State#state.window),
     UpdatedWindowSize = State#state.window_size - 1,
-    UpdatedWorkShares = update_work_share(Work#work.actor_id, -Work#work.weight, State#state.work_shares),
+    update_work_share(State#state.work_shares_table, Work#work.actor_id, -Work#work.weight),
     UpdatedState =
         State#state{
           window = UpdatedWindow,
-          window_size = UpdatedWindowSize,
-          work_shares = UpdatedWorkShares
+          window_size = UpdatedWindowSize
          },
     set_work_stats_status(outdated, UpdatedState).
 
@@ -441,6 +441,9 @@ hibernate(Parent, Debug, State) ->
 %%-------------------------------------------------------------------
 %% Internal Functions Definitions - Asking
 %%-------------------------------------------------------------------
+
+work_shares_table(Category) ->
+    list_to_atom("aequitas_category.work_shares." ++ atom_to_list(Category)).
 
 parse_ask_opts(Opts) ->
     DefaultParams =
@@ -485,7 +488,13 @@ maybe_return_stats_in_ask(Params, Status, State) ->
     end.
 
 current_work_share(ActorId, State) ->
-    maps:get(ActorId, State#state.work_shares, 0).
+    WorkSharesTable = State#state.work_shares_table,
+    case ets:lookup(WorkSharesTable, ActorId) of
+        [{_, WorkShare}] ->
+            WorkShare;
+        [] ->
+            0
+    end.
 
 work_limit(IQRMultiplier, State) ->
     case State#state.work_stats of
@@ -511,29 +520,17 @@ accept(ActorId, Params, State) ->
 
     UpdatedWindow = queue:in(Work, State#state.window),
     UpdatedWindowSize = State#state.window_size + 1,
-    UpdatedWorkShares =
-        update_work_share(Work#work.actor_id, Params#ask_params.weight, State#state.work_shares),
+    update_work_share(State#state.work_shares_table, Work#work.actor_id, Params#ask_params.weight),
     UpdatedState =
         State#state{
           window = UpdatedWindow,
-          window_size = UpdatedWindowSize,
-          work_shares = UpdatedWorkShares
+          window_size = UpdatedWindowSize
          },
     set_work_stats_status(outdated, UpdatedState).
 
-update_work_share(ActorId, ShareIncr, WorkShares) ->
-    ShareLookup = maps:find(ActorId, WorkShares),
-    update_work_share(ActorId, ShareLookup, ShareIncr, WorkShares).
-
-update_work_share(ActorId, {ok, Share}, ShareIncr, WorkShares) ->
-    update_existing_work_share(ActorId, Share + ShareIncr, WorkShares);
-update_work_share(ActorId, error, ShareIncr, WorkShares) ->
-    maps:put(ActorId, ShareIncr, WorkShares).
-
-update_existing_work_share(ActorId, UpdatedShare, WorkShares) when UpdatedShare =:= 0 ->
-    maps:remove(ActorId, WorkShares);
-update_existing_work_share(ActorId, UpdatedShare, WorkShares) ->
-    maps:update(ActorId, UpdatedShare, WorkShares).
+update_work_share(Table, ActorId, ShareIncr) ->
+    (ets:update_counter(Table, ActorId, {2,ShareIncr}, {ActorId,0}) =:= 0
+     andalso ets:delete(Table, ActorId)).
 
 set_work_stats_status(Status, State) ->
     case {State#state.work_stats_status, Status} of

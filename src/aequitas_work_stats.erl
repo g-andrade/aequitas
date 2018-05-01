@@ -20,6 +20,8 @@
 
 -module(aequitas_work_stats).
 
+-include_lib("stdlib/include/ms_transform.hrl").
+
 % https://gist.github.com/marcelog/97708058cd17f86326c82970a7f81d40#file-simpleproc-erl
 
 %%-------------------------------------------------------------------
@@ -27,9 +29,9 @@
 %%-------------------------------------------------------------------
 
 -export(
-   [start_link/1,
-    start/1,
-    generate_work_stats/2
+   [start_link/2,
+    start/2,
+    generate_work_stats/1
    ]).
 
 -ignore_xref(
@@ -62,7 +64,8 @@
 
 -record(state, {
           category_pid :: pid(),
-          category_mon :: reference()
+          category_mon :: reference(),
+          work_shares_table :: ets:tab()
          }).
 -type state() :: #state{}.
 
@@ -79,20 +82,20 @@
 %% API Function Definitions
 %%-------------------------------------------------------------------
 
--spec start_link(pid()) -> {ok, pid()}.
+-spec start_link(pid(), ets:tab()) -> {ok, pid()}.
 %% @private
-start_link(CategoryPid) ->
-    proc_lib:start_link(?MODULE, init, [{self(), [CategoryPid]}]).
+start_link(CategoryPid, WorkSharesTable) ->
+    proc_lib:start_link(?MODULE, init, [{self(), [CategoryPid, WorkSharesTable]}]).
 
--spec start(pid()) -> {ok, pid()}.
+-spec start(pid(), ets:tab()) -> {ok, pid()}.
 %% @private
-start(CategoryPid) ->
-    aequitas_work_stats_sup:start_child([CategoryPid]).
+start(CategoryPid, WorkSharesTable) ->
+    aequitas_work_stats_sup:start_child([CategoryPid, WorkSharesTable]).
 
--spec generate_work_stats(pid(), #{ term() => pos_integer() }) -> ok.
+-spec generate_work_stats(pid()) -> ok.
 %% @private
-generate_work_stats(WorkStatsPid, WorkShares) ->
-    WorkStatsPid ! {generate_work_stats, WorkShares},
+generate_work_stats(WorkStatsPid) ->
+    WorkStatsPid ! generate_work_stats,
     ok.
 
 %%-------------------------------------------------------------------
@@ -101,13 +104,14 @@ generate_work_stats(WorkStatsPid, WorkShares) ->
 
 -spec init({pid(), [pid(), ...]}) -> no_return().
 %% @private
-init({Parent, [CategoryPid]}) ->
+init({Parent, [CategoryPid, WorkSharesTable]}) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     Debug = sys:debug_options([]),
     State =
         #state{
            category_pid = CategoryPid,
-           category_mon = monitor(process, CategoryPid)
+           category_mon = monitor(process, CategoryPid),
+           work_shares_table = WorkSharesTable
           },
     loop(Parent, Debug, State).
 
@@ -152,8 +156,14 @@ loop(Parent, Debug, State) ->
             hibernate(Parent, Debug, State)
     end.
 
-handle_nonsystem_msg({generate_work_stats, WorkShares}, State) ->
-    WorkStats = crunch_work_stats(WorkShares),
+handle_nonsystem_msg(generate_work_stats, State) ->
+    MatchSpec =
+        ets:fun2ms(
+          fun ({_ActorId, Share}) when Share > 0 ->
+                  Share
+          end),
+    Samples = ets:select(State#state.work_shares_table, MatchSpec),
+    WorkStats = crunch_work_stats(Samples),
     aequitas_category:report_work_stats(State#state.category_pid, WorkStats),
     State;
 handle_nonsystem_msg({'DOWN', Ref, process, _Pid, _Reason}, State)
@@ -169,14 +179,13 @@ hibernate(Parent, Debug, State) ->
 %% Internal Functions Definitions - Requests
 %%-------------------------------------------------------------------
 
-crunch_work_stats(WorkShares) ->
-    NrOfSamples = map_size(WorkShares),
+crunch_work_stats(Samples) ->
+    NrOfSamples = length(Samples),
     case NrOfSamples < 3 of
         true ->
             % not enough samples
             #{ nr_of_samples => NrOfSamples };
         false ->
-            Samples = maps:values(WorkShares),
             SortedSamples = lists:sort(Samples),
             {Q2, LowerHalf, UpperHalf} = median_split(SortedSamples),
             {Q1, _, _} = median_split(LowerHalf),
