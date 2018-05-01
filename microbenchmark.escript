@@ -6,7 +6,7 @@
 main([]) ->
     Category = microbenchmarking,
     NrOfWorkers = 100,
-    NrOfCalls = 400000,
+    NrOfCalls = 2000000,
     {ok, _} = application:ensure_all_started(aequitas),
     {ok, _} = application:ensure_all_started(sasl),
     do_it(Category, NrOfWorkers, NrOfCalls).

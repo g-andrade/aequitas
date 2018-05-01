@@ -1,3 +1,24 @@
+%% Copyright (c) 2018 Guilherme Andrade
+%%
+%% Permission is hereby granted, free of charge, to any person obtaining a
+%% copy  of this software and associated documentation files (the "Software"),
+%% to deal in the Software without restriction, including without limitation
+%% the rights to use, copy, modify, merge, publish, distribute, sublicense,
+%% and/or sell copies of the Software, and to permit persons to whom the
+%% Software is furnished to do so, subject to the following conditions:
+%%
+%% The above copyright notice and this permission notice shall be included in
+%% all copies or substantial portions of the Software.
+%%
+%% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+%% IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+%% FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+%% AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+%% LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+%% FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+%% DEALINGS IN THE SOFTWARE.
+
+%% @private
 -module(aequitas_category_sup).
 -behaviour(supervisor).
 
@@ -6,8 +27,12 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [start_link/1,
-    start/1
+   [start_link/0,
+    start_child/1
+   ]).
+
+-ignore_xref(
+   [start_link/0
    ]).
 
 %% ------------------------------------------------------------------
@@ -21,33 +46,36 @@
 %% ------------------------------------------------------------------
 
 -define(CB_MODULE, ?MODULE).
+-define(SERVER, ?MODULE).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-start_link(Category) ->
-    supervisor:start_link(?CB_MODULE, [Category]).
+-spec start_link() -> {ok, pid()}.
+start_link() ->
+    supervisor:start_link({local, ?SERVER}, ?CB_MODULE, []).
 
-start(Category) ->
-    aequitas_categories_sup:start_child([Category]).
+-spec start_child([term()]) -> {ok, pid()} | {error, term()}.
+start_child(Args) ->
+    supervisor:start_child(?SERVER, Args).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
-init([Category]) ->
+-spec init([]) -> {ok, {supervisor:sup_flags(), 
+                        [supervisor:child_spec(), ...]}}.
+init([]) ->
     SupFlags =
-        #{ strategy => rest_for_one,
+        #{ strategy => simple_one_for_one,
            intensity => 10,
            period => 1
          },
-    Children =
-        [#{ id => category_broker,
-            start => {aequitas_category_broker, start_link, [Category]}
-          },
-         #{ id => category_regulator,
-            start => {aequitas_category_regulator, start_link, [Category]}
+    ChildSpecs =
+        [#{ id => category,
+            start => {aequitas_category, start_link, []},
+            restart => temporary
           }
         ],
-    {ok, {SupFlags, Children}}.
+    {ok, {SupFlags, ChildSpecs}}.

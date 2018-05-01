@@ -19,7 +19,7 @@
 %% DEALINGS IN THE SOFTWARE.
 
 %% @private
--module(aequitas_sup).
+-module(aequitas_work_stats_sup).
 -behaviour(supervisor).
 
 %% ------------------------------------------------------------------
@@ -27,7 +27,8 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [start_link/0
+   [start_link/0,
+    start_child/1
    ]).
 
 -ignore_xref(
@@ -38,14 +39,13 @@
 %% supervisor Function Exports
 %% ------------------------------------------------------------------
 
--export(
-   [init/1
-   ]).
+-export([init/1]).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
 %% ------------------------------------------------------------------
 
+-define(CB_MODULE, ?MODULE).
 -define(SERVER, ?MODULE).
 
 %% ------------------------------------------------------------------
@@ -54,7 +54,11 @@
 
 -spec start_link() -> {ok, pid()}.
 start_link() ->
-    supervisor:start_link({local, ?SERVER}, ?MODULE, []).
+    supervisor:start_link({local, ?SERVER}, ?CB_MODULE, []).
+
+-spec start_child([term()]) -> {ok, pid()} | {error, term()}.
+start_child(Args) ->
+    supervisor:start_child(?SERVER, Args).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Definitions
@@ -64,20 +68,14 @@ start_link() ->
                         [supervisor:child_spec(), ...]}}.
 init([]) ->
     SupFlags =
-        #{ strategy => rest_for_one,
+        #{ strategy => simple_one_for_one,
            intensity => 10,
            period => 1
          },
     ChildSpecs =
-        [#{ id => cfg,
-            start => {aequitas_cfg, start_link, []}
-          },
-         #{ id => work_stats_sup,
-            start => {aequitas_work_stats_sup, start_link, []},
-            type => supervisor
-          },
-         #{ id => category_sup,
-            start => {aequitas_category_sup, start_link, []},
-            type => supervisor
-          }],
+        [#{ id => work_stats,
+            start => {aequitas_work_stats, start_link, []},
+            restart => temporary
+          }
+        ],
     {ok, {SupFlags, ChildSpecs}}.
