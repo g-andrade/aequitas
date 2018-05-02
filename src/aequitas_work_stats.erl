@@ -74,7 +74,8 @@
            q1 => number(),
            q2 => number(),
            q3 => number(),
-           iqr => number()
+           iqr => number(),
+           seconds_to_generate => number()
          }.
 -export_type([t/0]).
 
@@ -180,21 +181,27 @@ hibernate(Parent, Debug, State) ->
 %%-------------------------------------------------------------------
 
 crunch_work_stats(Samples) ->
+    StartTs = erlang:monotonic_time(nano_seconds),
     NrOfSamples = length(Samples),
     case NrOfSamples < 3 of
         true ->
             % not enough samples
-            #{ nr_of_samples => NrOfSamples };
+            EndTs = erlang:monotonic_time(nano_seconds),
+            #{ nr_of_samples => NrOfSamples ,
+               seconds_to_generate => (EndTs - StartTs) / 1.0e9
+             };
         false ->
             SortedSamples = lists:sort(Samples),
             {Q2, LowerHalf, UpperHalf} = median_split(SortedSamples),
             {Q1, _, _} = median_split(LowerHalf),
             {Q3, _, _} = median_split(UpperHalf),
+            EndTs = erlang:monotonic_time(nano_seconds),
             #{ nr_of_samples => NrOfSamples,
                q1 => Q1,
                q2 => Q2,
                q3 => Q3,
-               iqr => Q3 - Q1
+               iqr => Q3 - Q1,
+               seconds_to_generate => (EndTs - StartTs) / 1.0e9
              }
     end.
 

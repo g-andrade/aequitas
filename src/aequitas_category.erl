@@ -221,7 +221,7 @@ init({Parent, [Category]}) ->
                    window_size = 0,
                    work_shares_table = WorkSharesTable,
                    work_stats_status = updated,
-                   work_stats = #{ nr_of_samples => 0 },
+                   work_stats = #{ nr_of_samples => 0, seconds_to_generate => 0 },
                    work_stats_pid = WorkStatsPid,
                    work_stats_mon = monitor(process, WorkStatsPid)
                   },
