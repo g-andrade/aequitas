@@ -210,7 +210,7 @@ init({Parent, [Category]}) ->
         true ->
             Settings = load_settings(Category),
             WorkSharesTable = work_shares_table(Category),
-            _ = ets:new(WorkSharesTable, [named_table, protected]),
+            _ = ets:new(WorkSharesTable, [named_table, protected, {read_concurrency,true}]),
             {ok, WorkStatsPid} = aequitas_work_stats:start(self(), WorkSharesTable),
             proc_lib:init_ack(Parent, {ok, self()}),
             State =
