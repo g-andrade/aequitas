@@ -77,6 +77,7 @@
 
 -define(DEFAULT_WORK_WEIGHT, 1).
 -define(DEFAULT_IQR_MULTIPLIER, 1.5).
+-define(DEFAULT_MAX_GLOBAL_RATE, infinity).
 -define(DEFAULT_RETURN_STATS, false).
 
 -define(is_pos_integer(V), (is_integer((V)) andalso ((V) > 0))).
@@ -118,6 +119,7 @@
 -record(ask_params, {
           weight :: pos_integer(),
           iqr_multiplier :: number(),
+          max_global_rate :: non_neg_integer() | infinity,
           return_stats :: boolean()
          }).
 
@@ -129,6 +131,7 @@
 -type ask_opt() ::
         {weight, pos_integer()} |
         {iqr_multiplier, number()} |
+        {max_global_rate, non_neg_integer() | infinity} |
         return_stats.
 -export_type([ask_opt/0]).
 
@@ -450,6 +453,7 @@ parse_ask_opts(Opts) ->
         #ask_params{
            weight = ?DEFAULT_WORK_WEIGHT,
            iqr_multiplier = ?DEFAULT_IQR_MULTIPLIER,
+           max_global_rate = ?DEFAULT_MAX_GLOBAL_RATE,
            return_stats = ?DEFAULT_RETURN_STATS
           },
     parse_ask_opts(Opts, DefaultParams).
@@ -460,6 +464,10 @@ parse_ask_opts([{weight, Weight} | Next], Acc)
 parse_ask_opts([{iqr_multiplier, IQRMultiplier} | Next], Acc)
   when ?is_non_neg_number(IQRMultiplier) ->
     parse_ask_opts(Next, Acc#ask_params{ iqr_multiplier = IQRMultiplier });
+parse_ask_opts([{max_global_rate, MaxGlobalRate} | Next], Acc)
+  when ?is_non_neg_number(MaxGlobalRate);
+       MaxGlobalRate =:= infinity ->
+    parse_ask_opts(Next, Acc#ask_params{ max_global_rate = MaxGlobalRate });
 parse_ask_opts([return_stats | Next], Acc) ->
     parse_ask_opts(Next, Acc#ask_params{ return_stats = true });
 parse_ask_opts([], Acc) ->
@@ -469,13 +477,16 @@ parse_ask_opts(InvalidOpts, _Acc) ->
 
 handle_ask(ActorId, Params, State) ->
     IQRMultiplier = Params#ask_params.iqr_multiplier,
+    MaxGlobalRate = Params#ask_params.max_global_rate,
     CurrentWorkShare = current_work_share(ActorId, State),
-    WorkLimit = work_limit(IQRMultiplier, State),
-    case CurrentWorkShare > WorkLimit of
+    Now = erlang:monotonic_time(milli_seconds),
+    case has_reached_work_limit(CurrentWorkShare, IQRMultiplier, State) orelse
+         would_reach_max_rate(MaxGlobalRate, Now, State)
+    of
         true ->
             maybe_return_stats_in_ask(Params, rejected, State);
         _ ->
-            UpdatedState = accept(ActorId, Params, State),
+            UpdatedState = accept(ActorId, Params, Now, State),
             maybe_return_stats_in_ask(Params, accepted, UpdatedState)
     end.
 
@@ -496,26 +507,36 @@ current_work_share(ActorId, State) ->
             0
     end.
 
-work_limit(IQRMultiplier, State) ->
+has_reached_work_limit(CurrentWorkShare, IQRMultiplier, State) ->
     case State#state.work_stats of
         #{ q3 := Q3, iqr := IQR } ->
-            Q3 + (IQR * IQRMultiplier);
-        #{} ->
+            CurrentWorkShare > (Q3 + (IQR * IQRMultiplier));
+        _ ->
             % not enough samples
-            infinity
+            false
     end.
 
-accept(ActorId, Params, State)
+would_reach_max_rate(MaxGlobalRate, Timestamp, State) ->
+    (MaxGlobalRate =/= infinity andalso
+     State#state.window_size =/= 0 andalso
+     begin
+         {value, OldestWork} = queue:peek(State#state.window),
+         TimeElapsed = max(1, Timestamp - OldestWork#work.timestamp),
+         WouldBeGlobalRate = State#state.window_size * (1000 / TimeElapsed),
+         WouldBeGlobalRate >= MaxGlobalRate
+     end).
+
+accept(ActorId, Params, Timestamp, State)
   when State#state.window_size >= (State#state.settings)#settings.max_window_size ->
     {value, Work} = queue:peek(State#state.window),
     UpdatedState = drop_work(Work, State),
-    accept(ActorId, Params, UpdatedState);
-accept(ActorId, Params, State) ->
+    accept(ActorId, Params, Timestamp, UpdatedState);
+accept(ActorId, Params, Timestamp, State) ->
     Work =
         #work{
            actor_id = ActorId,
            weight = Params#ask_params.weight,
-           timestamp = erlang:monotonic_time(milli_seconds)
+           timestamp = Timestamp
           },
 
     UpdatedWindow = queue:in(Work, State#state.window),

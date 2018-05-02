@@ -22,8 +22,15 @@ do_it(Category, NrOfWorkers, NrOfCalls) ->
     wait_for_workers(WithMonitors, []).
 
 wait_for_workers([], ResultAcc) ->
-    TotalCount = trunc( lists:sum(ResultAcc) ),
-    io:format("achieved an average of ~p calls per second", [TotalCount]),
+    UniqueAequitasResults = lists:usort( lists:flatten([maps:keys(M) || M <- ResultAcc]) ),
+    lists:foreach(
+      fun (AequitasResult) ->
+              Counts = [maps:get(AequitasResult, M, 0) || M <- ResultAcc],
+              TotalCount = trunc(lists:sum(Counts)),
+              io:format("achieved an average of ~p '~p' results per second~n",
+                        [TotalCount, AequitasResult])
+      end,
+      UniqueAequitasResults),
     erlang:halt();
 wait_for_workers(WithMonitors, ResultAcc) ->
     receive
@@ -37,13 +44,27 @@ wait_for_workers(WithMonitors, ResultAcc) ->
     end.
 
 run_worker(Category, Nr, Parent, NrOfCalls) ->
-    run_worker_loop(Category, Nr, Parent, NrOfCalls, erlang:monotonic_time(milli_seconds), 0).
+    run_worker_loop(Category, Nr, Parent, NrOfCalls,
+                    erlang:monotonic_time(milli_seconds), 0, #{}).
 
-run_worker_loop(_Category, _Nr, Parent, NrOfCalls, StartTs, Count) when Count =:= NrOfCalls ->
+run_worker_loop(_Category, _Nr, Parent, NrOfCalls, StartTs,
+                Count, CountPerResult) when Count =:= NrOfCalls ->
     EndTs = erlang:monotonic_time(milli_seconds),
     TimeElapsed = EndTs - StartTs,
-    PerSecond = (Count / (TimeElapsed / 1000)),
-    Parent ! {worker_result, self(), PerSecond};
-run_worker_loop(Category, Nr, Parent, NrOfCalls, StartTs, Count) ->
-    _ = aequitas:ask(Category, Nr),
-    run_worker_loop(Category, Nr, Parent, NrOfCalls, StartTs, Count + 1).
+    AdjustedCountPerResult =
+        maps:map(
+          fun (_Result, Count) ->
+                  (Count / (TimeElapsed / 1000))
+          end,
+          CountPerResult),
+    Parent ! {worker_result, self(), AdjustedCountPerResult};
+run_worker_loop(Category, Nr, Parent, NrOfCalls, StartTs, Count, CountPerResult) ->
+    Result = aequitas:ask(Category, Nr),
+    UpdatedCountPerResult = maps_increment(Result, +1, CountPerResult),
+    run_worker_loop(Category, Nr, Parent, NrOfCalls, StartTs, Count + 1, UpdatedCountPerResult).
+
+maps_increment(Key, Incr, Map) ->
+    maps:update_with(
+      Key,
+      fun (Value) -> Value + Incr end,
+      Incr, Map).
