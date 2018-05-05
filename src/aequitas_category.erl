@@ -77,7 +77,7 @@
 
 -define(DEFAULT_WORK_WEIGHT, 1).
 -define(DEFAULT_IQR_MULTIPLIER, 1.5).
--define(DEFAULT_MAX_GLOBAL_RATE, infinity).
+-define(DEFAULT_MAX_COLLECTIVE_RATE, infinity).
 -define(DEFAULT_RETURN_STATS, false).
 
 -define(is_pos_integer(V), (is_integer((V)) andalso ((V) > 0))).
@@ -119,7 +119,7 @@
 -record(ask_params, {
           weight :: pos_integer(),
           iqr_multiplier :: number(),
-          max_global_rate :: non_neg_integer() | infinity,
+          max_collective_rate :: non_neg_integer() | infinity,
           return_stats :: boolean()
          }).
 
@@ -131,7 +131,7 @@
 -type ask_opt() ::
         {weight, pos_integer()} |
         {iqr_multiplier, number()} |
-        {max_global_rate, non_neg_integer() | infinity} |
+        {max_collective_rate, non_neg_integer() | infinity} |
         return_stats.
 -export_type([ask_opt/0]).
 
@@ -453,7 +453,7 @@ parse_ask_opts(Opts) ->
         #ask_params{
            weight = ?DEFAULT_WORK_WEIGHT,
            iqr_multiplier = ?DEFAULT_IQR_MULTIPLIER,
-           max_global_rate = ?DEFAULT_MAX_GLOBAL_RATE,
+           max_collective_rate = ?DEFAULT_MAX_COLLECTIVE_RATE,
            return_stats = ?DEFAULT_RETURN_STATS
           },
     parse_ask_opts(Opts, DefaultParams).
@@ -464,10 +464,10 @@ parse_ask_opts([{weight, Weight} | Next], Acc)
 parse_ask_opts([{iqr_multiplier, IQRMultiplier} | Next], Acc)
   when ?is_non_neg_number(IQRMultiplier) ->
     parse_ask_opts(Next, Acc#ask_params{ iqr_multiplier = IQRMultiplier });
-parse_ask_opts([{max_global_rate, MaxGlobalRate} | Next], Acc)
-  when ?is_non_neg_number(MaxGlobalRate);
-       MaxGlobalRate =:= infinity ->
-    parse_ask_opts(Next, Acc#ask_params{ max_global_rate = MaxGlobalRate });
+parse_ask_opts([{max_collective_rate, MaxCollectiveRate} | Next], Acc)
+  when ?is_non_neg_number(MaxCollectiveRate);
+       MaxCollectiveRate =:= infinity ->
+    parse_ask_opts(Next, Acc#ask_params{ max_collective_rate = MaxCollectiveRate });
 parse_ask_opts([return_stats | Next], Acc) ->
     parse_ask_opts(Next, Acc#ask_params{ return_stats = true });
 parse_ask_opts([], Acc) ->
@@ -477,11 +477,11 @@ parse_ask_opts(InvalidOpts, _Acc) ->
 
 handle_ask(ActorId, Params, State) ->
     IQRMultiplier = Params#ask_params.iqr_multiplier,
-    MaxGlobalRate = Params#ask_params.max_global_rate,
+    MaxCollectiveRate = Params#ask_params.max_collective_rate,
     CurrentWorkShare = current_work_share(ActorId, State),
     Now = erlang:monotonic_time(milli_seconds),
     case has_reached_work_limit(CurrentWorkShare, IQRMultiplier, State) orelse
-         would_reach_max_rate(MaxGlobalRate, Now, State)
+         would_reach_max_collective_rate(MaxCollectiveRate, Now, State)
     of
         true ->
             maybe_return_stats_in_ask(Params, rejected, State);
@@ -516,14 +516,14 @@ has_reached_work_limit(CurrentWorkShare, IQRMultiplier, State) ->
             false
     end.
 
-would_reach_max_rate(MaxGlobalRate, Timestamp, State) ->
-    (MaxGlobalRate =/= infinity andalso
+would_reach_max_collective_rate(MaxCollectiveRate, Timestamp, State) ->
+    (MaxCollectiveRate =/= infinity andalso
      State#state.window_size =/= 0 andalso
      begin
          {value, OldestWork} = queue:peek(State#state.window),
          TimeElapsed = max(1, Timestamp - OldestWork#work.timestamp),
-         WouldBeGlobalRate = State#state.window_size * (1000 / TimeElapsed),
-         WouldBeGlobalRate >= MaxGlobalRate
+         HypotheticalCollectiveRate = State#state.window_size * (1000 / TimeElapsed),
+         HypotheticalCollectiveRate >= MaxCollectiveRate
      end).
 
 accept(ActorId, Params, Timestamp, State)
