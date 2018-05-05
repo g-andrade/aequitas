@@ -213,8 +213,7 @@ init({Parent, [Category]}) ->
     try register(Server, self()) of
         true ->
             Settings = load_settings(Category),
-            WorkSharesTable = work_shares_table(Category),
-            _ = ets:new(WorkSharesTable, [named_table, protected, {read_concurrency,true}]),
+            WorkSharesTable = ets:new(work_shares, [protected, {read_concurrency,true}]),
             {ok, WorkStatsPid} = aequitas_work_stats:start(self(), WorkSharesTable),
             proc_lib:init_ack(Parent, {ok, self()}),
             State =
@@ -465,9 +464,6 @@ hibernate(Parent, Debug, State) ->
 %%-------------------------------------------------------------------
 %% Internal Functions Definitions - Asking
 %%-------------------------------------------------------------------
-
-work_shares_table(Category) ->
-    list_to_atom("aequitas_category.work_shares." ++ atom_to_list(Category)).
 
 parse_ask_opts(Opts) ->
     DefaultParams =
