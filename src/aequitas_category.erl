@@ -81,6 +81,7 @@
 -define(DEFAULT_RETURN_STATS, false).
 
 -define(is_pos_integer(V), (is_integer((V)) andalso ((V) > 0))).
+-define(is_non_neg_integer(V), (is_integer((V)) andalso ((V) >= 0))).
 -define(is_non_neg_number(V), (is_number((V)) andalso ((V) >= 0))).
 
 %%-------------------------------------------------------------------
@@ -465,7 +466,7 @@ parse_ask_opts([{iqr_multiplier, IQRMultiplier} | Next], Acc)
   when ?is_non_neg_number(IQRMultiplier) ->
     parse_ask_opts(Next, Acc#ask_params{ iqr_multiplier = IQRMultiplier });
 parse_ask_opts([{max_collective_rate, MaxCollectiveRate} | Next], Acc)
-  when ?is_non_neg_number(MaxCollectiveRate);
+  when ?is_non_neg_integer(MaxCollectiveRate);
        MaxCollectiveRate =:= infinity ->
     parse_ask_opts(Next, Acc#ask_params{ max_collective_rate = MaxCollectiveRate });
 parse_ask_opts([return_stats | Next], Acc) ->
