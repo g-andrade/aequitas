@@ -143,7 +143,10 @@
 -spec start_link(atom()) -> {ok, pid()} | {error, already_started}.
 %% @private
 start_link(Category) ->
-    proc_lib:start_link(?MODULE, init, [{self(), [Category]}]).
+    Args = [{self(), [Category]}],
+    Timeout = infinity,
+    Opts = [],
+    proc_lib:start_link(?MODULE, init, Args, Timeout, Opts).
 
 -spec ask(atom() | pid(), term(), [ask_opt()]) -> Status | {Status, Stats}
              when Status :: accepted | rejected,
