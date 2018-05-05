@@ -461,16 +461,24 @@ parse_ask_opts(Opts) ->
 
 parse_ask_opts([{weight, Weight} | Next], Acc)
   when ?is_pos_integer(Weight) ->
-    parse_ask_opts(Next, Acc#ask_params{ weight = Weight });
+    parse_ask_opts(
+      Next, Acc#ask_params{ weight = Weight }
+     );
 parse_ask_opts([{iqr_multiplier, IQRMultiplier} | Next], Acc)
   when ?is_non_neg_number(IQRMultiplier) ->
-    parse_ask_opts(Next, Acc#ask_params{ iqr_multiplier = IQRMultiplier });
+    parse_ask_opts(
+      Next, Acc#ask_params{ iqr_multiplier = IQRMultiplier }
+     );
 parse_ask_opts([{max_collective_rate, MaxCollectiveRate} | Next], Acc)
   when ?is_non_neg_integer(MaxCollectiveRate);
        MaxCollectiveRate =:= infinity ->
-    parse_ask_opts(Next, Acc#ask_params{ max_collective_rate = MaxCollectiveRate });
+    parse_ask_opts(
+      Next, Acc#ask_params{ max_collective_rate = MaxCollectiveRate }
+     );
 parse_ask_opts([return_stats | Next], Acc) ->
-    parse_ask_opts(Next, Acc#ask_params{ return_stats = true });
+    parse_ask_opts(
+      Next, Acc#ask_params{ return_stats = true }
+     );
 parse_ask_opts([], Acc) ->
     Acc;
 parse_ask_opts([InvalidOpt|_], _Acc) ->
