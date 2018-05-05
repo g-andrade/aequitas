@@ -74,10 +74,10 @@
 
 -define(DEFAULT_MAX_WINDOW_SIZE, 10000).
 -define(DEFAULT_MAX_WINDOW_DURATION, 5000).
-
--define(DEFAULT_WORK_WEIGHT, 1).
 -define(DEFAULT_IQR_MULTIPLIER, 1.5).
 -define(DEFAULT_MAX_COLLECTIVE_RATE, infinity).
+
+-define(DEFAULT_WORK_WEIGHT, 1).
 -define(DEFAULT_RETURN_STATS, false).
 
 -define(is_pos_integer(V), (is_integer((V)) andalso ((V) > 0))).
@@ -90,7 +90,9 @@
 
 -record(settings, {
           max_window_size :: pos_integer() | infinity,
-          max_window_duration :: pos_integer() | infinity
+          max_window_duration :: pos_integer() | infinity,
+          iqr_multiplier :: number(),
+          max_collective_rate :: non_neg_integer() | infinity
          }).
 -type settings() :: #settings{}.
 
@@ -119,20 +121,18 @@
 
 -record(ask_params, {
           weight :: pos_integer(),
-          iqr_multiplier :: number(),
-          max_collective_rate :: non_neg_integer() | infinity,
           return_stats :: boolean()
          }).
 
 -type setting_opt() ::
         {max_window_size, pos_integer() | infinity} |
-        {max_window_duration, pos_integer() | infinity}.
+        {max_window_duration, pos_integer() | infinity} |
+        {iqr_multiplier, number()} |
+        {max_collective_rate, non_neg_integer() | infinity}.
 -export_type([setting_opt/0]).
 
 -type ask_opt() ::
         {weight, pos_integer()} |
-        {iqr_multiplier, number()} |
-        {max_collective_rate, non_neg_integer() | infinity} |
         return_stats.
 -export_type([ask_opt/0]).
 
@@ -302,16 +302,33 @@ load_settings(Category) ->
 parse_settings_opts(SettingOpts) ->
     DefaultSettings =
         #settings{ max_window_size = ?DEFAULT_MAX_WINDOW_SIZE,
-                   max_window_duration = ?DEFAULT_MAX_WINDOW_DURATION
+                   max_window_duration = ?DEFAULT_MAX_WINDOW_DURATION,
+                   iqr_multiplier = ?DEFAULT_IQR_MULTIPLIER,
+                   max_collective_rate = ?DEFAULT_MAX_COLLECTIVE_RATE
                  },
     parse_settings_opts(SettingOpts, DefaultSettings).
 
 parse_settings_opts([{max_window_size, MaxWindowSize} | Next], Acc)
   when ?is_pos_integer(MaxWindowSize); MaxWindowSize =:= infinity ->
-    parse_settings_opts(Next, Acc#settings{ max_window_size = MaxWindowSize });
+    parse_settings_opts(
+      Next, Acc#settings{ max_window_size = MaxWindowSize }
+     );
 parse_settings_opts([{max_window_duration, MaxWindowDuration} | Next], Acc)
   when ?is_pos_integer(MaxWindowDuration); MaxWindowDuration =:= infinity ->
-    parse_settings_opts(Next, Acc#settings{ max_window_duration = MaxWindowDuration });
+    parse_settings_opts(
+      Next, Acc#settings{ max_window_duration = MaxWindowDuration }
+     );
+parse_settings_opts([{iqr_multiplier, IQRMultiplier} | Next], Acc)
+  when ?is_non_neg_number(IQRMultiplier) ->
+    parse_settings_opts(
+      Next, Acc#settings{ iqr_multiplier = IQRMultiplier }
+     );
+parse_settings_opts([{max_collective_rate, MaxCollectiveRate} | Next], Acc)
+  when ?is_non_neg_integer(MaxCollectiveRate);
+       MaxCollectiveRate =:= infinity ->
+    parse_settings_opts(
+      Next, Acc#settings{ max_collective_rate = MaxCollectiveRate }
+     );
 parse_settings_opts([], Acc) ->
     {ok, Acc};
 parse_settings_opts([InvalidOpt | _Next], _Acc) ->
@@ -456,8 +473,6 @@ parse_ask_opts(Opts) ->
     DefaultParams =
         #ask_params{
            weight = ?DEFAULT_WORK_WEIGHT,
-           iqr_multiplier = ?DEFAULT_IQR_MULTIPLIER,
-           max_collective_rate = ?DEFAULT_MAX_COLLECTIVE_RATE,
            return_stats = ?DEFAULT_RETURN_STATS
           },
     parse_ask_opts(Opts, DefaultParams).
@@ -466,17 +481,6 @@ parse_ask_opts([{weight, Weight} | Next], Acc)
   when ?is_pos_integer(Weight) ->
     parse_ask_opts(
       Next, Acc#ask_params{ weight = Weight }
-     );
-parse_ask_opts([{iqr_multiplier, IQRMultiplier} | Next], Acc)
-  when ?is_non_neg_number(IQRMultiplier) ->
-    parse_ask_opts(
-      Next, Acc#ask_params{ iqr_multiplier = IQRMultiplier }
-     );
-parse_ask_opts([{max_collective_rate, MaxCollectiveRate} | Next], Acc)
-  when ?is_non_neg_integer(MaxCollectiveRate);
-       MaxCollectiveRate =:= infinity ->
-    parse_ask_opts(
-      Next, Acc#ask_params{ max_collective_rate = MaxCollectiveRate }
      );
 parse_ask_opts([return_stats | Next], Acc) ->
     parse_ask_opts(
@@ -491,8 +495,8 @@ parse_ask_opts(InvalidOpts, _Acc) ->
 
 handle_ask(ActorId, AskParams, State) ->
     Now = erlang:monotonic_time(milli_seconds),
-    case has_reached_work_limit(ActorId, AskParams, State) orelse
-         would_reach_max_collective_rate(AskParams, Now, State)
+    case has_reached_work_limit(ActorId, State) orelse
+         would_reach_max_collective_rate(Now, State)
     of
         true ->
             maybe_return_stats_in_ask(AskParams, rejected, State);
@@ -509,11 +513,12 @@ maybe_return_stats_in_ask(Params, Status, State) ->
             {Status, State}
     end.
 
-has_reached_work_limit(ActorId, AskParams, State) ->
+has_reached_work_limit(ActorId, State) ->
     case State#state.work_stats of
         #{ q3 := Q3, iqr := IQR } ->
             CurrentWorkShare = current_work_share(ActorId, State),
-            IQRMultiplier = AskParams#ask_params.iqr_multiplier,
+            Settings = State#state.settings,
+            IQRMultiplier = Settings#settings.iqr_multiplier,
             CurrentWorkShare > (Q3 + (IQR * IQRMultiplier));
         _ ->
             % not enough samples
@@ -529,8 +534,9 @@ current_work_share(ActorId, State) ->
             0
     end.
 
-would_reach_max_collective_rate(AskParams, Timestamp, State) ->
-    MaxCollectiveRate = AskParams#ask_params.max_collective_rate,
+would_reach_max_collective_rate(Timestamp, State) ->
+    Settings = State#state.settings,
+    MaxCollectiveRate = Settings#settings.max_collective_rate,
     (MaxCollectiveRate =/= infinity andalso
      State#state.window_size =/= 0 andalso
      begin

@@ -32,12 +32,12 @@ all() ->
 
 groups() ->
     [{Group, [parallel], test_cases()}
-     || Group <- ['10actors_20mean_10dev',
-                  '100actors_200mean_100dev',
-                  '1000actors_20mean_10dev',
-                  '10000actors_3mean_0dev',
-                  '10actors_100mean_20dev',
-                  '100actors_10mean_0dev'
+     || Group <- ['10actors_20mean_10dev_1.5iqr',
+                  '100actors_200mean_100dev_1.5iqr',
+                  '1000actors_20mean_10dev_2.0iqr',
+                  '10000actors_3mean_0dev_0.5iqr',
+                  '10actors_100mean_20dev_3.0iqr',
+                  '100actors_10mean_0dev_10.0iqr'
                  ]].
 
 test_cases() ->
@@ -65,14 +65,20 @@ group_params(Group) ->
     [{nr_of_actors, match_suffixed_param(Tokens, "actors")},
      {nr_of_requests_mean, match_suffixed_param(Tokens, "mean")},
      {nr_of_requests_stddev, match_suffixed_param(Tokens, "dev")},
-     {iqr_multiplier_range, {1, 3}}
+     {iqr_multiplier, match_suffixed_param(Tokens, "iqr")}
     ].
 
 match_suffixed_param([H|T], Suffix) ->
     case lists:suffix(Suffix, H) of
         true ->
             ParamStr = lists:sublist(H, length(H) - length(Suffix)),
-            list_to_integer(ParamStr);
+            try list_to_float(ParamStr) of
+                Float ->
+                    Float
+            catch
+                error:badarg ->
+                    list_to_integer(ParamStr)
+            end;
         false ->
             match_suffixed_param(T, Suffix)
     end.
@@ -84,8 +90,12 @@ init_per_testcase(TestCase, Config) ->
                  ++ "."
                  ++ atom_to_list(TestCase)),
 
-    ok = aequitas:configure(Category, [{max_window_size, infinity},
-                                       {max_window_duration, infinity}]),
+    IQRMultiplier = proplists:get_value(iqr_multiplier, Config),
+    ok = aequitas:configure(
+           Category, [{max_window_size, infinity},
+                      {max_window_duration, infinity},
+                      {iqr_multiplier, IQRMultiplier}
+                     ]),
     [{category, Category}
      | Config].
 
@@ -115,11 +125,10 @@ correct_iqr_enforcement_test(Config) ->
 
 correct_iqr_enforcement_test([Actor | NextActors], Config, WorkShares) ->
     Category = proplists:get_value(category, Config),
-    {MinIQRMultiplier, MaxIQRMultiplier} = proplists:get_value(iqr_multiplier_range, Config),
-    IQRMultiplier = MinIQRMultiplier + (rand:uniform() * MaxIQRMultiplier - MinIQRMultiplier),
-    AskOpts = [{iqr_multiplier, IQRMultiplier}, return_stats],
+    AskOpts = [return_stats],
 
     {AskResult, Stats} = aequitas:ask(Category, Actor, AskOpts),
+    IQRMultiplier = proplists:get_value(iqr_multiplier, Config),
     ExpectedAskResult = expected_ask_result(Actor, IQRMultiplier, WorkShares, Stats),
     ?assertEqual(ExpectedAskResult, AskResult),
 
