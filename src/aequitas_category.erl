@@ -119,10 +119,10 @@
          }).
 -type state() :: #state{}.
 
--record(ask_params, {
-          weight :: pos_integer(),
-          return_stats :: boolean()
-         }).
+-type ask_params() ::
+        #{ weight => pos_integer(),
+           return_stats => boolean()
+         }.
 
 -type setting_opt() ::
         {max_window_size, pos_integer() | infinity} |
@@ -465,22 +465,18 @@ hibernate(Parent, Debug, State) ->
 %% Internal Functions Definitions - Asking
 %%-------------------------------------------------------------------
 
+-spec parse_ask_opts([ask_opt()]) -> ask_params().
 parse_ask_opts(Opts) ->
-    DefaultParams =
-        #ask_params{
-           weight = ?DEFAULT_WORK_WEIGHT,
-           return_stats = ?DEFAULT_RETURN_STATS
-          },
-    parse_ask_opts(Opts, DefaultParams).
+    parse_ask_opts(Opts, #{}).
 
 parse_ask_opts([{weight, Weight} | Next], Acc)
   when ?is_pos_integer(Weight) ->
     parse_ask_opts(
-      Next, Acc#ask_params{ weight = Weight }
+      Next, Acc#{ weight => Weight }
      );
 parse_ask_opts([return_stats | Next], Acc) ->
     parse_ask_opts(
-      Next, Acc#ask_params{ return_stats = true }
+      Next, Acc#{ return_stats => true }
      );
 parse_ask_opts([], Acc) ->
     Acc;
@@ -501,13 +497,10 @@ handle_ask(ActorId, AskParams, State) ->
             maybe_return_stats_in_ask(AskParams, accepted, UpdatedState)
     end.
 
-maybe_return_stats_in_ask(Params, Status, State) ->
-    case Params#ask_params.return_stats of
-        true ->
-            {{Status, State#state.work_stats}, State};
-        _ ->
-            {Status, State}
-    end.
+maybe_return_stats_in_ask(#{ return_stats := true }, Status, State) ->
+    {{Status, State#state.work_stats}, State};
+maybe_return_stats_in_ask(_AskParams, Status, State) ->
+    {Status, State}.
 
 has_reached_work_limit(ActorId, State) ->
     case State#state.work_stats of
@@ -548,16 +541,17 @@ accept(ActorId, Params, Timestamp, State)
     UpdatedState = drop_work(Work, State),
     accept(ActorId, Params, Timestamp, UpdatedState);
 accept(ActorId, Params, Timestamp, State) ->
+    Weight = maps:get(weight, Params, ?DEFAULT_WORK_WEIGHT),
     Work =
         #work{
            actor_id = ActorId,
-           weight = Params#ask_params.weight,
+           weight = Weight,
            timestamp = Timestamp
           },
 
     UpdatedWindow = queue:in(Work, State#state.window),
     UpdatedWindowSize = State#state.window_size + 1,
-    update_work_share(State#state.work_shares_table, Work#work.actor_id, Params#ask_params.weight),
+    update_work_share(State#state.work_shares_table, ActorId, Weight),
     UpdatedState =
         State#state{
           window = UpdatedWindow,
