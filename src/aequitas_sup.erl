@@ -69,7 +69,10 @@ init([]) ->
            period => 1
          },
     ChildSpecs =
-        [#{ id => cfg,
+        [#{ id => proc_reg,
+            start => {aequitas_proc_reg, start_link, []}
+          },
+         #{ id => cfg,
             start => {aequitas_cfg, start_link, []}
           },
          #{ id => work_stats_sup,

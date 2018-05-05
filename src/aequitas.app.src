@@ -5,9 +5,7 @@
   {mod, {aequitas_app, []}},
   {applications,
    [kernel,
-    stdlib,
-    % external dependencies
-    gproc
+    stdlib
    ]},
   {env,[]},
   {modules, []},

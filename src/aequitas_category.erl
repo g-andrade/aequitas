@@ -144,7 +144,7 @@
 %% API Function Definitions
 %%-------------------------------------------------------------------
 
--spec start_link(atom()) -> {ok, pid()} | {error, {already_started, pid()}}.
+-spec start_link(atom()) -> {ok, pid()} | {error, {already_started,pid()}}.
 %% @private
 start_link(Category) ->
     Args = [{self(), [Category]}],
@@ -214,8 +214,8 @@ report_work_stats(Pid, WorkStats) ->
 init({Parent, [Category]}) ->
     Debug = sys:debug_options([]),
     Server = server_name(Category),
-    case gproc:reg_or_locate({n,l,Server}) of
-        {OwnPid, _} when OwnPid =:= self() ->
+    case aequitas_proc_reg:register(Server, self()) of
+        ok ->
             Settings = load_settings(Category),
             WorkSharesTable = ets:new(work_shares, [protected, {read_concurrency,true}]),
             {ok, WorkStatsPid} = aequitas_work_stats:start(self(), WorkSharesTable),
@@ -233,7 +233,7 @@ init({Parent, [Category]}) ->
                    work_stats_mon = monitor(process, WorkStatsPid)
                   },
             loop(Parent, Debug, State);
-        {ExistingPid, _} ->
+        {error, {already_registered, ExistingPid}} ->
             proc_lib:init_ack(Parent, {error, {already_started, ExistingPid}})
     end.
 
@@ -267,7 +267,7 @@ system_code_change(State, _Module, _OldVsn, _Extra) ->
 
 ensure_server(Category) ->
     Server = server_name(Category),
-    case gproc:lookup_local_name({n,l,Server}) of
+    case aequitas_proc_reg:whereis(Server) of
         undefined ->
             case aequitas_category_sup:start_child([Category]) of
                 {ok, Pid} ->
@@ -279,7 +279,7 @@ ensure_server(Category) ->
             Pid
     end.
 
--spec reload_settings(term()) -> ok.
+-spec reload_settings(atom()) -> ok.
 %% @private
 reload_settings(Category) when is_atom(Category) ->
     Pid = ensure_server(Category),
@@ -287,7 +287,10 @@ reload_settings(Category) when is_atom(Category) ->
     wait_call_reply(Tag, Mon).
 
 server_name(Category) ->
-    {?MODULE, Category}.
+    list_to_atom(
+      atom_to_list(?MODULE)
+      ++ "."
+      ++ atom_to_list(Category)).
 
 load_settings(Category) ->
     SettingOpts = aequitas_cfg:get({category, Category}, []),
