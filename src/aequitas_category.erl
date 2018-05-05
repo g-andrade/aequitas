@@ -416,8 +416,8 @@ handle_msg(Msg, Parent, Debug, State) ->
     UpdatedDebug = sys:handle_debug(Debug, fun ?MODULE:write_debug/3, ?MODULE, {in, Msg}),
     handle_nonsystem_msg(Msg, Parent, UpdatedDebug, State).
 
-handle_nonsystem_msg({call, Pid, Tag, {ask, ActorId, Params}}, Parent, Debug, State) ->
-    {Reply, UpdatedState} = handle_ask(ActorId, Params, State),
+handle_nonsystem_msg({call, Pid, Tag, {ask, ActorId, AskParams}}, Parent, Debug, State) ->
+    {Reply, UpdatedState} = handle_ask(ActorId, AskParams, State),
     Pid ! {Tag, Reply},
     loop(Parent, Debug, UpdatedState);
 handle_nonsystem_msg({call, Pid, Tag, reload_settings}, Parent, Debug, State) ->
@@ -478,19 +478,16 @@ parse_ask_opts([InvalidOpt|_], _Acc) ->
 parse_ask_opts(InvalidOpts, _Acc) ->
     error({badarg, InvalidOpts}).
 
-handle_ask(ActorId, Params, State) ->
-    IQRMultiplier = Params#ask_params.iqr_multiplier,
-    MaxCollectiveRate = Params#ask_params.max_collective_rate,
-    CurrentWorkShare = current_work_share(ActorId, State),
+handle_ask(ActorId, AskParams, State) ->
     Now = erlang:monotonic_time(milli_seconds),
-    case has_reached_work_limit(CurrentWorkShare, IQRMultiplier, State) orelse
-         would_reach_max_collective_rate(MaxCollectiveRate, Now, State)
+    case has_reached_work_limit(ActorId, AskParams, State) orelse
+         would_reach_max_collective_rate(AskParams, Now, State)
     of
         true ->
-            maybe_return_stats_in_ask(Params, rejected, State);
+            maybe_return_stats_in_ask(AskParams, rejected, State);
         _ ->
-            UpdatedState = accept(ActorId, Params, Now, State),
-            maybe_return_stats_in_ask(Params, accepted, UpdatedState)
+            UpdatedState = accept(ActorId, AskParams, Now, State),
+            maybe_return_stats_in_ask(AskParams, accepted, UpdatedState)
     end.
 
 maybe_return_stats_in_ask(Params, Status, State) ->
@@ -499,6 +496,17 @@ maybe_return_stats_in_ask(Params, Status, State) ->
             {{Status, State#state.work_stats}, State};
         _ ->
             {Status, State}
+    end.
+
+has_reached_work_limit(ActorId, AskParams, State) ->
+    case State#state.work_stats of
+        #{ q3 := Q3, iqr := IQR } ->
+            CurrentWorkShare = current_work_share(ActorId, State),
+            IQRMultiplier = AskParams#ask_params.iqr_multiplier,
+            CurrentWorkShare > (Q3 + (IQR * IQRMultiplier));
+        _ ->
+            % not enough samples
+            false
     end.
 
 current_work_share(ActorId, State) ->
@@ -510,16 +518,8 @@ current_work_share(ActorId, State) ->
             0
     end.
 
-has_reached_work_limit(CurrentWorkShare, IQRMultiplier, State) ->
-    case State#state.work_stats of
-        #{ q3 := Q3, iqr := IQR } ->
-            CurrentWorkShare > (Q3 + (IQR * IQRMultiplier));
-        _ ->
-            % not enough samples
-            false
-    end.
-
-would_reach_max_collective_rate(MaxCollectiveRate, Timestamp, State) ->
+would_reach_max_collective_rate(AskParams, Timestamp, State) ->
+    MaxCollectiveRate = AskParams#ask_params.max_collective_rate,
     (MaxCollectiveRate =/= infinity andalso
      State#state.window_size =/= 0 andalso
      begin
