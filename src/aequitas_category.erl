@@ -415,7 +415,7 @@ loop_action(empty, Settings, _State)
   when Settings#settings.max_window_duration =/= infinity ->
     IdleTimeout = Settings#settings.max_window_duration,
     {hibernate_after, IdleTimeout};
-loop_action(_Work, _Settings, _State) ->
+loop_action(_WorkPeek, _Settings, _State) ->
     simple.
 
 drop_work(Work, State) ->
