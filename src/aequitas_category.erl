@@ -126,13 +126,17 @@
 
 -type setting_opt() ::
         {max_window_size, pos_integer() | infinity} |
-        {max_window_duration, pos_integer() | infinity} |
+        {max_window_duration, pos_integer() | infinity}.
+-export_type([setting_opt/0]).
+
+-type overridable_setting_opt() ::
         {iqr_multiplier, number()} |
         {max_collective_rate, non_neg_integer() | infinity}.
--export_type([setting_opt/0]).
+-export_type([overridable_setting_opt/0]).
 
 -type ask_opt() ::
         {weight, pos_integer()} |
+        {override, overridable_setting_opt()} |
         return_stats.
 -export_type([ask_opt/0]).
 
@@ -478,6 +482,16 @@ parse_ask_opts([return_stats | Next], Acc) ->
     parse_ask_opts(
       Next, Acc#{ return_stats => true }
      );
+parse_ask_opts([{override, {iqr_multiplier, IQRMultiplier}} | Next], Acc)
+  when ?is_non_neg_number(IQRMultiplier) ->
+    parse_ask_opts(
+      Next, Acc#{ iqr_multiplier => IQRMultiplier }
+     );
+parse_ask_opts([{override, {max_collective_rate, MaxCollectiveRate}} | Next], Acc)
+  when ?is_non_neg_integer(MaxCollectiveRate) ->
+    parse_ask_opts(
+      Next, Acc#{ max_collective_rate => MaxCollectiveRate }
+     );
 parse_ask_opts([], Acc) ->
     Acc;
 parse_ask_opts([InvalidOpt|_], _Acc) ->
@@ -487,8 +501,8 @@ parse_ask_opts(InvalidOpts, _Acc) ->
 
 handle_ask(ActorId, AskParams, State) ->
     Now = erlang:monotonic_time(milli_seconds),
-    case has_reached_work_limit(ActorId, State) orelse
-         would_reach_max_collective_rate(Now, State)
+    case has_reached_work_limit(ActorId, AskParams, State) orelse
+         would_reach_max_collective_rate(AskParams, Now, State)
     of
         true ->
             maybe_return_stats_in_ask(AskParams, rejected, State);
@@ -502,12 +516,11 @@ maybe_return_stats_in_ask(#{ return_stats := true }, Status, State) ->
 maybe_return_stats_in_ask(_AskParams, Status, State) ->
     {Status, State}.
 
-has_reached_work_limit(ActorId, State) ->
+has_reached_work_limit(ActorId, AskParams, State) ->
     case State#state.work_stats of
         #{ q3 := Q3, iqr := IQR } ->
             CurrentWorkShare = current_work_share(ActorId, State),
-            Settings = State#state.settings,
-            IQRMultiplier = Settings#settings.iqr_multiplier,
+            IQRMultiplier = iqr_multiplier(AskParams, State),
             CurrentWorkShare > (Q3 + (IQR * IQRMultiplier));
         _ ->
             % not enough samples
@@ -523,9 +536,12 @@ current_work_share(ActorId, State) ->
             0
     end.
 
-would_reach_max_collective_rate(Timestamp, State) ->
+iqr_multiplier(AskParams, State) ->
     Settings = State#state.settings,
-    MaxCollectiveRate = Settings#settings.max_collective_rate,
+    maps:get(iqr_multiplier, AskParams, Settings#settings.iqr_multiplier).
+
+would_reach_max_collective_rate(AskParams, Timestamp, State) ->
+    MaxCollectiveRate = max_collective_rate(AskParams, State),
     (MaxCollectiveRate =/= infinity andalso
      State#state.window_size =/= 0 andalso
      begin
@@ -534,6 +550,10 @@ would_reach_max_collective_rate(Timestamp, State) ->
          HypotheticalCollectiveRate = State#state.window_size * (1000 / TimeElapsed),
          HypotheticalCollectiveRate >= MaxCollectiveRate
      end).
+
+max_collective_rate(AskParams, State) ->
+    Settings = State#state.settings,
+    maps:get(max_collective_rate, AskParams, Settings#settings.max_collective_rate).
 
 accept(ActorId, Params, Timestamp, State)
   when State#state.window_size >= (State#state.settings)#settings.max_window_size ->
