@@ -473,6 +473,8 @@ parse_ask_opts([return_stats | Next], Acc) ->
     parse_ask_opts(Next, Acc#ask_params{ return_stats = true });
 parse_ask_opts([], Acc) ->
     Acc;
+parse_ask_opts([InvalidOpt|_], _Acc) ->
+    error({badarg, InvalidOpt});
 parse_ask_opts(InvalidOpts, _Acc) ->
     error({badarg, InvalidOpts}).
 
