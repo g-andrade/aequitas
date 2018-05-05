@@ -144,7 +144,7 @@
 %% API Function Definitions
 %%-------------------------------------------------------------------
 
--spec start_link(atom()) -> {ok, pid()} | {error, already_started}.
+-spec start_link(atom()) -> {ok, pid()} | {error, {already_started, pid()}}.
 %% @private
 start_link(Category) ->
     Args = [{self(), [Category]}],
@@ -214,8 +214,8 @@ report_work_stats(Pid, WorkStats) ->
 init({Parent, [Category]}) ->
     Debug = sys:debug_options([]),
     Server = server_name(Category),
-    try register(Server, self()) of
-        true ->
+    case gproc:reg_or_locate({n,l,Server}) of
+        {OwnPid, _} when OwnPid =:= self() ->
             Settings = load_settings(Category),
             WorkSharesTable = ets:new(work_shares, [protected, {read_concurrency,true}]),
             {ok, WorkStatsPid} = aequitas_work_stats:start(self(), WorkSharesTable),
@@ -232,10 +232,9 @@ init({Parent, [Category]}) ->
                    work_stats_pid = WorkStatsPid,
                    work_stats_mon = monitor(process, WorkStatsPid)
                   },
-            loop(Parent, Debug, State)
-    catch
-        error:badarg ->
-            proc_lib:init_ack(Parent, {error, already_started})
+            loop(Parent, Debug, State);
+        {ExistingPid, _} ->
+            proc_lib:init_ack(Parent, {error, {already_started, ExistingPid}})
     end.
 
 -spec write_debug(io:device(), term(), term()) -> ok.
@@ -268,19 +267,19 @@ system_code_change(State, _Module, _OldVsn, _Extra) ->
 
 ensure_server(Category) ->
     Server = server_name(Category),
-    case whereis(Server) of
+    case gproc:lookup_local_name({n,l,Server}) of
         undefined ->
             case aequitas_category_sup:start_child([Category]) of
                 {ok, Pid} ->
                     Pid;
-                {error, already_started} ->
-                    whereis(Server)
+                {error, {already_started, ExistingPid}} ->
+                    ExistingPid
             end;
         Pid ->
             Pid
     end.
 
--spec reload_settings(atom()) -> ok.
+-spec reload_settings(term()) -> ok.
 %% @private
 reload_settings(Category) when is_atom(Category) ->
     Pid = ensure_server(Category),
@@ -288,10 +287,7 @@ reload_settings(Category) when is_atom(Category) ->
     wait_call_reply(Tag, Mon).
 
 server_name(Category) ->
-    list_to_atom(
-      atom_to_list(?MODULE)
-      ++ "."
-      ++ atom_to_list(Category)).
+    {?MODULE, Category}.
 
 load_settings(Category) ->
     SettingOpts = aequitas_cfg:get({category, Category}, []),
