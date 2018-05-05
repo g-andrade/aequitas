@@ -123,7 +123,7 @@ code_change(_OldVsn, State, _Extra) ->
 assert_app_config_validity() ->
     AppConfig = application:get_all_env(aequitas),
     lists:foreach(
-      fun ({{category, Category}, SettingOpts}) when is_atom(Category) ->
+      fun ({{category, Category}, SettingOpts}) ->
               case aequitas_category:validate_settings(SettingOpts) of
                   ok -> ok;
                   {error, Reason} ->

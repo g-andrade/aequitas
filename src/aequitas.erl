@@ -49,7 +49,7 @@
 %% @see async_ask/3
 %% @see async_ask/2
 -spec ask(Category, ActorId) -> Status | {Status, Stats}
-    when Category :: atom(),
+    when Category :: term(),
          ActorId :: term(),
          Status :: accepted | rejected,
          Stats :: aequitas_work_stats:t().
@@ -59,8 +59,8 @@ ask(Category, ActorId) ->
 %% @doc Request permission to perform work, identified under `ActorId', within `Category'
 %%
 %% <ul>
-%% <li>`Category' must be an atom.</li>
-%% <li>`ActorId' must be a term.</li>
+%% <li>`Category' can by any term.</li>
+%% <li>`ActorId' can be any term.</li>
 %% <li>`Opts' must be a list of `aequitas_category:ask_opt()' values</li>
 %% </ul>
 %%
@@ -73,7 +73,7 @@ ask(Category, ActorId) ->
 %% @see async_ask/3
 %% @see async_ask/2
 -spec ask(Category, ActorId, Opts) -> Status | {Status, Stats}
-    when Category :: atom(),
+    when Category :: term(),
          ActorId :: term(),
          Opts :: [aequitas_category:ask_opt()],
          Status :: accepted | rejected,
@@ -86,7 +86,7 @@ ask(Category, ActorId, Opts) ->
 %% @see ask/3
 %% @see ask/2
 -spec async_ask(Category, ActorId) -> {Tag, Monitor}
-    when Category :: atom(),
+    when Category :: term(),
          ActorId :: term(),
          Tag :: reference(),
          Monitor :: reference().
@@ -112,7 +112,7 @@ async_ask(Category, ActorId) ->
 %% @see ask/3
 %% @see ask/2
 -spec async_ask(Category, ActorId, Opts) -> {Tag, Monitor}
-    when Category :: atom(),
+    when Category :: term(),
          ActorId :: term(),
          Opts :: [aequitas_category:ask_opt()],
          Tag :: reference(),
@@ -123,7 +123,7 @@ async_ask(Category, ActorId, Opts) ->
 %% @doc Tweak settings of work `Category'
 %%
 %% <ul>
-%% <li>`Category' must be an atom.</li>
+%% <li>`Category' can be any term.</li>
 %% <li>`SettingOpts' must be a list of `aequitas_category:setting_opt()' values</li>
 %% </ul>
 %%
@@ -134,7 +134,7 @@ async_ask(Category, ActorId, Opts) ->
 %% </ul>
 -spec configure(Category, SettingOpts)
         -> ok | {error, Reason}
-    when Category :: atom(),
+    when Category :: term(),
          SettingOpts :: [aequitas_category:setting_opt()],
          Reason :: {invalid_setting_opt | invalid_setting_opts, term()}.
 configure(Category, SettingOpts) ->

@@ -104,7 +104,7 @@
 -type work() :: #work{}.
 
 -record(state, {
-          category :: atom(), % the category identifier
+          category :: term(), % the category identifier
           settings :: settings(), % the category settings
           %%
           window :: queue:queue(work()), % sliding window
@@ -144,7 +144,7 @@
 %% API Function Definitions
 %%-------------------------------------------------------------------
 
--spec start_link(atom()) -> {ok, pid()} | {error, {already_started,pid()}}.
+-spec start_link(term()) -> {ok, pid()} | {error, {already_started,pid()}}.
 %% @private
 start_link(Category) ->
     Args = [{self(), [Category]}],
@@ -152,30 +152,25 @@ start_link(Category) ->
     Opts = [],
     proc_lib:start_link(?MODULE, init, Args, Timeout, Opts).
 
--spec ask(atom() | pid(), term(), [ask_opt()]) -> Status | {Status, Stats}
+-spec ask(term(), term(), [ask_opt()]) -> Status | {Status, Stats}
              when Status :: accepted | rejected,
                   Stats :: aequitas_work_stats:t().
 %% @private
-ask(Category, ActorId, Opts) when is_atom(Category) ->
-    Pid = ensure_server(Category),
-    ask(Pid, ActorId, Opts);
-ask(Pid, ActorId, Opts) when is_pid(Pid) ->
-    {Tag, Mon} = async_ask(Pid, ActorId, Opts),
+ask(Category, ActorId, Opts) ->
+    {Tag, Mon} = async_ask(Category, ActorId, Opts),
     wait_call_reply(Tag, Mon).
 
--spec async_ask(atom() | pid(), term(), [ask_opt()]) -> {reference(), reference()}.
+-spec async_ask(term(), term(), [ask_opt()]) -> {reference(), reference()}.
 %% @private
-async_ask(Category, ActorId, Opts) when is_atom(Category) ->
+async_ask(Category, ActorId, Opts) ->
     Pid = ensure_server(Category),
-    async_ask(Pid, ActorId, Opts);
-async_ask(Pid, ActorId, Opts) when is_pid(Pid) ->
     Params = parse_ask_opts(Opts),
     send_call(Pid, {ask, ActorId, Params}).
 
--spec set_settings(atom(), [setting_opt()])
+-spec set_settings(term(), [setting_opt()])
         -> ok | {error, {invalid_setting_opt | invalid_setting_opts, _}}.
 %% @private
-set_settings(Category, SettingOpts) when is_atom(Category) ->
+set_settings(Category, SettingOpts) ->
     case validate_settings(SettingOpts) of
         ok ->
             aequitas_cfg:set({category, Category}, SettingOpts),
@@ -194,9 +189,9 @@ validate_settings(SettingOpts) ->
             {error, Reason}
     end.
 
--spec async_reload_settings(atom()) -> ok.
+-spec async_reload_settings(term()) -> ok.
 %% @private
-async_reload_settings(Category) when is_atom(Category) ->
+async_reload_settings(Category) ->
     Pid = ensure_server(Category),
     send_cast(Pid, reload_settings).
 
@@ -209,7 +204,7 @@ report_work_stats(Pid, WorkStats) ->
 %% OTP Function Definitions
 %%-------------------------------------------------------------------
 
--spec init({pid(), [atom(), ...]}) -> no_return().
+-spec init({pid(), [term(), ...]}) -> no_return().
 %% @private
 init({Parent, [Category]}) ->
     Debug = sys:debug_options([]),
@@ -279,18 +274,15 @@ ensure_server(Category) ->
             Pid
     end.
 
--spec reload_settings(atom()) -> ok.
+-spec reload_settings(term()) -> ok.
 %% @private
-reload_settings(Category) when is_atom(Category) ->
+reload_settings(Category) ->
     Pid = ensure_server(Category),
     {Tag, Mon} = send_call(Pid, reload_settings),
     wait_call_reply(Tag, Mon).
 
 server_name(Category) ->
-    list_to_atom(
-      atom_to_list(?MODULE)
-      ++ "."
-      ++ atom_to_list(Category)).
+    {?MODULE, Category}.
 
 load_settings(Category) ->
     SettingOpts = aequitas_cfg:get({category, Category}, []),
