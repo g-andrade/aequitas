@@ -11,7 +11,7 @@
 It intends on allowing fair access to limited external resources, like databases and web services,
 amongst distinct actors.
 
-It does so by attempting to detect outliers amongst ordinary workload distributions.
+It does so by attempting to detect outliers in ordinary workload distributions.
 
 <h4>Example</h4>
 
