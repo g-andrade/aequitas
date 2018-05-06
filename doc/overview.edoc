@@ -88,7 +88,7 @@ The following options can be used to tweak categories, both through
 </li>
 <li>`{min_actor_count, _}'
     <ul>
-    <li>Establishes a minimum number of tracked actors that's required
+    <li>Establishes the requirement of a minimum amount of tracked actors
         before <a href="#outlier-detection">outlier detection</a> is performed
     </li>
     <li>Default is 30; value must be a positive integer</li>
