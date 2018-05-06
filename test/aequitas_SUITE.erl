@@ -145,8 +145,8 @@ rate_limited_acceptances_test(_Config) ->
             ct:pal("AcceptedRate: ~p", [AcceptedRate]),
             ct:pal("ExpectedRate: ~p", [ExpectedRate]),
             ct:pal("Ratio: ~p", [Ratio]),
-            ?assert(Ratio >= 0.95),
-            ?assert(Ratio =< 1.05),
+            ?assert(Ratio >= 0.90),
+            ?assert(Ratio =< 1.10),
             ok;
         {'DOWN', WorkerMon, process, _Pid, Reason} ->
             error({worker_died, Reason})

@@ -408,7 +408,7 @@ loop(Parent, Debug, State) ->
                 Msg ->
                     handle_msg(Msg, Parent, Debug, State)
             after
-                5000 ->
+                ?HIBERNATION_TIMEOUT ->
                     hibernate(Parent, Debug, State)
             end;
         {drop, Work} ->
