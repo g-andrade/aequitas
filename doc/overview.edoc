@@ -18,7 +18,7 @@ It does so by attempting to detect outliers in ordinary workload distributions.
 There's a web server handling HTTP requests. We want to ensure misbehaving
 IP addresses don't steal (too much) system capacity from benevolent clients.
 
-We'll name our category `http_requests' and start it. Categories and
+We'll name our category `http_requests' and start its handler. Categories and
 actors can be represented by any term.
 
 <pre lang="erlang" class="erlang">
