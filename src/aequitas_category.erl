@@ -656,7 +656,10 @@ replenish_coll_limiter_capacity(LastReplenishTs, Settings, CollLimiter) ->
                 % account for delays
                 BaseRatio = ?COLL_LIMITER_UPDATE_PERIOD / 1000,
                 TimeElapsed = Now - LastReplenishTs,
-                DelayCompensationRatio = TimeElapsed / erlang:convert_time_unit(1, seconds, native),
+                DelayCompensationRatio =
+                    (TimeElapsed /
+                     erlang:convert_time_unit(?COLL_LIMITER_UPDATE_PERIOD, milli_seconds, native)
+                    ),
                 trunc(BaseRatio * DelayCompensationRatio * Settings#settings.max_collective_rate)
         end,
     schedule_coll_limiter_capacity_replenishment(?COLL_LIMITER_UPDATE_PERIOD, Now),
