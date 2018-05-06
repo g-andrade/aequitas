@@ -8,7 +8,7 @@
 
 /ˈae̯.kʷi.taːs/
 
-<h3>aequitas - Fairness Regulator with Rate Limiting</h3>
+<h3>aequitas - Fair regulator and rate limiter</h3>
 
 `aequitas' is a fairness regulator library for Erlang/OTP and Elixir, with optional rate limiting capabilities.
 
@@ -39,24 +39,31 @@ represented by any term, and the necessary processes are created on demand.
 end.]]>
 </pre>
 
-Some more definitions of the `:ask' function exist, including one
-where options can be specified (`:ask/3') and two asynchronous
-versions (`:async_ask/2' and `:async_ask/3') which are analogous versions
-of their synchronous counterparts that return acceptance status
-asynchronously.
-
-<h4>Requirements</h4>
-
+Some more definitions of the `:ask' function exist:
 <ul>
-<li>Erlang/OTP 18.0 or higher</li>
-<li>rebar3</li>
+<li>`:ask(Category, ActorId, Opts)'
+- for <a href="#work-request-tweaking">tweaking</a>
+</li>
+<li>`:async_ask(Category, ActorId)'
+- analogous to `:ask/2' but replies asynchronously
+</li>
+<li>`:async_ask(Category, ActorId, Opts)'
+- analogous to `:ask/3' but replies asynchronously
+</li>
 </ul>
 
 <h4 id="documentation-and-reference">Documentation and Reference</h4>
 
 Documentation and reference are hosted on <a target="_parent" href="https://hexdocs.pm/aequitas/">HexDocs</a>.
 
-<h4>Category Tweaking</h4>
+<h4>Tested setup</h4>
+
+<ul>
+<li>Erlang/OTP 18.0 or higher</li>
+<li>rebar3</li>
+</ul>
+
+<h4 id="category-tweaking">Category Tweaking</h4>
 
 The following settings can be used to tweak categories, both through
 <a href="#static-configuration">static</a> and
@@ -64,10 +71,11 @@ The following settings can be used to tweak categories, both through
 
 <ul>
 <li>`max_window_size': Enforces a ceiling on how many of the last work acceptances
-<a href="#work-tracking">we'll track</a> (default is 10000; must be a positive integer or infinity)
+will be <a href="#work-tracking">tracked</a> (default is 10000; must be a positive integer or infinity)
 </li>
-<li>`max_window_duration': Enforces a maximum age, in milliseconds, for the last work acceptances we'll track
-(default is 5000ms; must be a positive integer or infinity)
+<li>`max_window_duration': Enforces an eventual expiration of tracked work acceptances
+(default is `{seconds,5}'; must be of type `aequitas_time_interval:t()' or infinity
+- see <a href="#documentation-and-reference">type reference</a>)
 </li>
 <li>`iqr_factor': IQR factor used to <a href="#outlier-detection">detect outlying actors</a>
 among the workload distribution (default is 1.5; must be a non-negative number)
@@ -77,30 +85,29 @@ per second, on work acceptances (default is infinity; must be a non-negative int
 </li>
 </ul>
 
-<h4>Work Request Tweaking</h4>
+<h4 id="work-request-tweaking">Work Request Tweaking</h4>
 
 The following settings can be used to tweak individual work requests,
 i.e. in calls to either the `:ask/3' or `:async_ask/3' functions.
 
 <ul>
-<li>`weight': <a href="#work-weighting">Relative weight</a> of the work request
+<li>`weight': <a href="#work-weighing">Relative weight</a> of the work request
 (default is 1; must be a positive integer)
 </li>
 <li>`iqr_factor': Overrides the `iqr_factor' configured globally for the category;
 its meaning remains the same but it only applies to the work request that overrode it.
 </li>
-<li>`return_stats': Returns work stats, used to detect outliers, together with acceptance status
+<li>`return_stats': Returns the work stats used to detect outliers together with acceptance status
 (see <a href="#documentation-and-reference">API reference</a>)
 </li>
 </ul>
 
-<h4>Technical Details</h4>
+<h4 id="collective-rate-limiting">Collective Rate Limiting</h4>
 
-<h5 id="collective-rate-limiting">Collective Rate Limiting</h5>
+Collective rate limiting can be enabled in order to limit the total amount of work
+performed, per second, within a category.
 
-Collective rate limiting should give interesting results when triggered (if it's enabled.)
-
-Once a configured limit is reached, its enforcement should tend to homogenize
+Once the configured limit is reached, its enforcement should tend to homogenize
 the number of accepted work requests per actor, even in case of very unbalanced workloads
 - within the reach of the configured outlier detection, that is.
 
@@ -110,26 +117,19 @@ in every actor performing at most one request within the period covered by the s
 
 This contrasts with impartial rate limiting which is the scope of many other libraries,
 whereby the acception/rejection ratios per actor tend to be the same, independently of
-how much work each actor is effectively performing (and therefore their share in consumption
-of precious system resources.)
+how much work each actor is effectively performing.
 
-<h5 id="work-tracking">Work Tracking</h5>
+<a href="#work-weighing">Work weighing</a> is taken into account when rate limiting.
 
-Each category is backed by a process that keeps a sliding window; this sliding window helps
-keep track of how many work units were attributed to each actor within the last `N' accepted requests;
+<h4 id="outlier-detection">Outlier Detection</h4>
 
-The maximum size of the sliding window, `N', is determined by constraints derived
-from <a href="#category-tweaking">category settings</a>. Whenever this limit is reached,
-old events will be dropped until it is no longer so.
-
-<h5 id="outlier-detection">Outlier Detection</h5>
-
-The used outlier detection algorithm is based on
+The outlier detection algorithm is based on
 <a target="_parent" href="http://sphweb.bumc.bu.edu/otlt/MPH-Modules/BS/BS704_SummarizingData/BS704_SummarizingData7.html">John Tukey's fences</a>.
 
 The <a target="_parent" href="https://en.wikipedia.org/wiki/Interquartile_range">IQR</a> (interquartile range)
 of the work shares per actor, encompassed by the work tracker, is updated continuously (although asynchronously).
-Based on this statistical measure, whenever there's a new request for work execution we determine whether the actor's present work share is an outlier to the right.
+Based on this statistical measure, whenever there's a new request for work execution we determine whether
+the actor's present work share is an outlier to the right.
 
 The default threshold of outlier categorization is set to `Q3 + (1.5 x IQR)', with IQR being `Q3 - Q1'
 and Q1 and Q3 being the median values of the lower and higher halves of the samples, respectively.
@@ -141,12 +141,13 @@ as detailed previously.
 Lower values will result in greater intolerance of high work-share outliers; higher values, the opposite.
 
 The reason for picking `1.5' as the default is rather down to convention and might not be
-appropriate for your specific workloads. If necessary measure, adjust, repeat.
+appropriate for your specific workloads. If necessary: measure, adjust, repeat.
 
-It's entirely possible you'll conclude the IQR technique is not adequate to solve your problem;
-a score of other approaches exist, with many of them being computationally (much) more expensive.
+It's possible you'll conclude the IQR technique is not adequate to solve your problem;
+a score of other approaches exist, with many of them being computationally (much) more expensive,
+- it's a trade off between correctness and availability.
 
-<h5 id="work-weighting">Work Weighting</h5>
+<h4 id="work-weighing">Work Weighing</h4>
 
 Work requests can be weighted by specifying the `weight' option when
 asking permission to execute. It must be a positive integer;
@@ -167,7 +168,16 @@ This way, the work share of an IP address performing a few large requests
 could of similar magnitude to the work share of an IP address performing
 many small requests.
 
-<h5 id="static-configuration">Static Configuration</h5>
+<h4 id="work-tracking">Work Tracking</h4>
+
+Each category is backed by a process that keeps a sliding window; this sliding window helps
+keep track of how many work units were attributed to each actor within the last `N' accepted requests;
+
+The size of the sliding window, `N', is determined by constraints derived
+from <a href="#category-tweaking">category settings</a>. Whenever it gets excessively large,
+old events will be dropped until it is no longer so.
+
+<h4 id="static-configuration">Static Configuration</h4>
 
 The configuration of foreknown categories can be tweaked in `app.config' / `sys.config'
 by declaring the overriden settings, per category, in the following fashion:
@@ -176,11 +186,11 @@ by declaring the overriden settings, per category, in the following fashion:
 % ...
  {aequitas,
   [{{category, http_requests},
-    [{max_window_duration, 10000} % Override default 5s to 10s
+    [{max_window_duration, {seconds,10}} % Override default 5s to 10s
     ]},
 
    {{category, rare_ftp_requests},
-    [{max_window_size, 100} % Track up to the last 100 acceptances
+    [{max_window_size, 100} % Only track up to the last 100 acceptances
     ]}
   ]}
 % ...
@@ -190,14 +200,14 @@ Proper app. configuration reloads that result in calls to
 the application's internal `:config_change/3' callback will trigger
 a reload of settings in each of the relevant category processes.
 
-<h5 id="dynamic-configuration">Dynamic Configuration</h5>
+<h4 id="dynamic-configuration">Dynamic Configuration</h4>
 
 The configuration of specific categories can be tweaked in runtime
 by calling `aequitas:configure/2', e.g.:
 
 <pre lang="erlang" class="erlang">
 ok = aequitas:configure(http_requests,
-                        [{max_window_duration, 10000}]).
+                        [{max_window_duration, {seconds,10}}]).
 </pre>
 
 (Re)configuration performed this way will override the
