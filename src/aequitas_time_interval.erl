@@ -27,13 +27,13 @@
 -export([to_milliseconds/1]).
 
 %%-------------------------------------------------------------------
-%% Record and Type 
+%% Record and Type
 %%-------------------------------------------------------------------
 
 -type t() :: {unit(), number()}.
 -export_type([t/0]).
 
--type unit() :: 
+-type unit() ::
     milliseconds |
     seconds |
     minutes |
