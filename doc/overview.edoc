@@ -70,22 +70,43 @@ The following options can be used to tweak categories, both through
 <a href="#dynamic-configuration">dynamic configuration</a>.
 
 <ul>
-<li>`{max_window_size, _}': Enforces a ceiling on how many of the last work acceptances
-will be <a href="#work-tracking">tracked</a> (default is 10000; must be a positive integer or infinity)
+<li>`{max_window_size, _}'
+    <ul>
+    <li>Enforces a ceiling on how many of the last work acceptances
+        will be <a href="#work-tracking">tracked</a>
+    </li>
+    <li>Default is 10000; value must be a positive integer or infinity</li>
+    </ul>
 </li>
-<li>`{max_window_duration, _}': Enforces an eventual expiration of tracked work acceptances
-(default is `{seconds,5}'; must be of type `aequitas_time_interval:t()' or infinity
-- see <a href="#documentation-and-reference">type reference</a>)
+<li>`{max_window_duration, _}'
+    <ul>
+    <li>Enforces an eventual expiration of tracked work acceptances</li>
+    <li>Default is `{seconds,5}'; value must be of type `aequitas_time_interval:t()' or infinity
+        (see <a href="#documentation-and-reference">type reference</a>)
+    </li>
+    </ul>
 </li>
-<li>`{min_actor_count, _}': Establishes a minimum number of tracked actors that's required
-before <a href="#outlier-detection">outlier detection</a> is performed
-(default is 30; must be a positive integer)
+<li>`{min_actor_count, _}'
+    <ul>
+    <li>Establishes a minimum number of tracked actors that's required
+        before <a href="#outlier-detection">outlier detection</a> is performed
+    </li>
+    <li>Default is 30; value must be a positive integer</li>
+    </ul>
 </li>
-<li>`{iqr_factor, _}': IQR factor used to detect outlying actors
-among the workload distribution (default is 1.5; must be a non-negative number)
+<li>`{iqr_factor, _}'
+    <ul>
+    <li>IQR factor used to detect outlying actors among the workload distribution</li>
+    <li>Default is 1.5; value must be a non-negative number</li>
+    </ul>
 </li>
-<li>`{max_collective_rate, _}': Enforces a <a href="#collective-rate-limiting">collective rate limit</a>,
-per second, on work acceptances (default is infinity; must be a non-negative integer)
+<li>`{max_collective_rate, _}'
+    <ul>
+    <li>Enforces a <a href="#collective-rate-limiting">collective rate limit</a>,
+        per second, on work acceptances
+    </li>
+    <li>Default is infinity; value must be a non-negative integer</li>
+    </ul>
 </li>
 </ul>
 
@@ -95,17 +116,32 @@ The following options can be used to tweak individual work requests,
 i.e. in calls to either the `:ask/3' or `:async_ask/3' functions.
 
 <ul>
-<li>`{weight, _}': <a href="#work-weighing">Relative weight</a> of the work request
-(default is 1; must be a positive integer)
+<li>`{weight, _}'
+    <ul>
+    <li><a href="#work-weighing">Relative weight</a> of the work request</li>
+    <li>Default is 1; value must be a positive integer</li>
+    </ul>
 </li>
-<li>`{min_actor_count, _}': Overrides the `min_actor_count' configured globally for the category;
-its meaning remains but it only applies to the work request that overrode it
+<li>`{min_actor_count, _}'
+    <ul>
+    <li>Overrides the `min_actor_count' configured globally for the category;
+        its meaning remains but it only applies to the work request that overrode it
+    </li>
+    </ul>
 </li>
-<li>`{iqr_factor, _}': Overrides the `iqr_factor' configured globally for the category;
-its meaning remains but it only applies to the work request that overrode it
+<li>`{iqr_factor, _}'
+    <ul>
+    <li>Overrides the `iqr_factor' configured globally for the category;
+        its meaning remains but it only applies to the work request that overrode it
+    </li>
+    </ul>
 </li>
-<li>`return_stats': Returns the work stats used to detect outliers together with acceptance status
-(see <a href="#documentation-and-reference">API reference</a>)
+<li>`return_stats'
+    <ul>
+    <li>Return the work stats used to detect outliers together with acceptance status
+        (see <a href="#documentation-and-reference">API reference</a>)
+    </li>
+    </ul>
 </li>
 </ul>
 
