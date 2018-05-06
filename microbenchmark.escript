@@ -3,9 +3,11 @@
 
 -export([main/1]).
 
+-define(NR_OF_WORKERS, 100).
+
 main([]) ->
     Category = microbenchmarking,
-    NrOfWorkers = 100,
+    NrOfWorkers = ?NR_OF_WORKERS,
     NrOfCalls = 2000000,
     {ok, _} = application:ensure_all_started(aequitas),
     {ok, _} = application:ensure_all_started(sasl),
@@ -70,7 +72,9 @@ run_worker_loop(_Category, _Nr, Parent, NrOfCalls, StartTs,
           CountPerResult),
     Parent ! {worker_result, self(), AdjustedCountPerResult, SecondsToGenerateAcc};
 run_worker_loop(Category, Nr, Parent, NrOfCalls, StartTs, Count, CountPerResult, SecondsToGenerateAcc) ->
-    {Result, Stats} = aequitas:ask(Category, Nr, [return_stats]),
+    ActorId = abs(erlang:monotonic_time()) rem ?NR_OF_WORKERS,
+    {Result, Stats} = aequitas:ask(Category, ActorId, [return_stats]),
+    %_ = (Count rem 10000 =:= 10) andalso io:format("Stats (~p): ~p~n", [Nr, Stats]),
     true = (Result =/= error),
     UpdatedCountPerResult = maps_increment(Result, +1, CountPerResult),
     SecondsToGenerateStats = maps:get(seconds_to_generate, Stats),
