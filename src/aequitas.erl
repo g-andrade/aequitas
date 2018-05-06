@@ -126,7 +126,7 @@ ask(Category, ActorId) ->
 %% @doc Request permission to perform work, identified under `ActorId', within `Category'
 %%
 %% <ul>
-%% <li>`Category' can by any term.</li>
+%% <li>`Category' must refer to a started category handler.</li>
 %% <li>`ActorId' can be any term.</li>
 %% <li>`Opts' must be a list of `aequitas_category:ask_opt()' values</li>
 %% </ul>
@@ -195,7 +195,7 @@ async_ask(Category, ActorId, Opts) ->
 %% @doc Tweak settings of work `Category'
 %%
 %% <ul>
-%% <li>`Category' can be any term.</li>
+%% <li>`Category' must refer to a started category handler.</li>
 %% <li>`SettingOpts' must be a list of `aequitas_category:setting_opt()' values</li>
 %% </ul>
 %%
