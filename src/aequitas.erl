@@ -106,7 +106,7 @@ start(Category, Opts) ->
 %% @see reconfigure/2
 -spec stop(Category) -> ok | {error, Reason}
     when Category :: term(),
-         Reason :: not_running.
+         Reason :: not_started.
 stop(Category) ->
     aequitas_category:stop(Category).
 
@@ -119,7 +119,7 @@ stop(Category) ->
          ActorId :: term(),
          Status :: accepted | {rejected, RejectionReason},
          RejectionReason :: outlier | rate_limited,
-         Reason :: not_running.
+         Reason :: not_started.
 ask(Category, ActorId) ->
     ask(Category, ActorId, []).
 
@@ -147,7 +147,7 @@ ask(Category, ActorId) ->
          Status :: accepted | {rejected, RejectionReason},
          RejectionReason :: outlier | rate_limited,
          Stats :: aequitas_work_stats:t(),
-         Reason :: not_running.
+         Reason :: not_started.
 ask(Category, ActorId, Opts) ->
     aequitas_category:ask(Category, ActorId, Opts).
 
@@ -211,6 +211,6 @@ async_ask(Category, ActorId, Opts) ->
         -> ok | {error, Reason}
     when Category :: term(),
          SettingOpts :: [aequitas_category:setting_opt()],
-         Reason :: not_running | {invalid_setting_opt | invalid_setting_opts, term()}.
+         Reason :: not_started | {invalid_setting_opt | invalid_setting_opts, term()}.
 reconfigure(Category, SettingOpts) ->
     aequitas_category:update_settings(Category, SettingOpts).

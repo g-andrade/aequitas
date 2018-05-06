@@ -184,7 +184,7 @@ start(Category, SaveSettings, SettingOpts) ->
             {error, Reason}
     end.
 
--spec stop(term()) -> ok | {error, not_running}.
+-spec stop(term()) -> ok | {error, not_started}.
 %% @private
 stop(Category) ->
     Pid = whereis_server(Category),
@@ -196,7 +196,7 @@ stop(Category) ->
              when Status :: accepted | {rejected, RejectionReason},
                   RejectionReason :: outlier | rate_limited,
                   Stats :: aequitas_work_stats:t(),
-                  Reason :: not_running.
+                  Reason :: not_started.
 %% @private
 ask(Category, ActorId, Opts) ->
     {Tag, Mon} = async_ask(Category, ActorId, Opts),
@@ -210,7 +210,7 @@ async_ask(Category, ActorId, Opts) ->
     send_call(Pid, {ask, ActorId, Params}).
 
 -spec update_settings(term(), [setting_opt()])
-        -> ok | {error, not_running | {invalid_setting_opt | invalid_setting_opts, _}}.
+        -> ok | {error, not_started | {invalid_setting_opt | invalid_setting_opts, _}}.
 %% @private
 update_settings(Category, SettingOpts) ->
     case validate_settings(SettingOpts) of
@@ -315,7 +315,7 @@ validate_settings(SettingOpts) ->
             {error, Reason}
     end.
 
--spec reload_settings(term()) -> ok | {error, not_running}.
+-spec reload_settings(term()) -> ok | {error, not_started}.
 reload_settings(Category) ->
     Pid = whereis_server(Category),
     {Tag, Mon} = send_call(Pid, reload_settings),
@@ -411,7 +411,7 @@ wait_call_reply(Tag, Mon) ->
         {'DOWN', Mon, process, _Pid, Reason} when Reason =:= normal;
                                                   Reason =:= shutdown;
                                                   Reason =:= noproc ->
-            {error, not_running};
+            {error, not_started};
         {'DOWN', Mon, process, _Pid, Reason} ->
             error({category_process, Reason})
     end.
