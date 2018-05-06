@@ -80,6 +80,9 @@
 -define(DEFAULT_WORK_WEIGHT, 1).
 -define(DEFAULT_RETURN_STATS, false).
 
+-define(COLL_LIMITER_UPDATE_PERIOD, 500). % in milliseconds
+-define(COLL_LIMITER_MAX_DESIRE_HISTORY_SZ, 4).
+
 -define(is_pos_integer(V), (is_integer((V)) andalso ((V) > 0))).
 -define(is_non_neg_integer(V), (is_integer((V)) andalso ((V) >= 0))).
 -define(is_non_neg_number(V), (is_number((V)) andalso ((V) >= 0))).
@@ -103,6 +106,15 @@
          }).
 -type work() :: #work{}.
 
+-record(coll_limiter, {
+          capacity :: non_neg_integer() | infinity,
+          accepted :: non_neg_integer(),
+          rejected :: non_neg_integer(),
+          desire_history :: non_neg_integer(),
+          desire_history_size :: non_neg_integer()
+         }).
+-type coll_limiter() :: #coll_limiter{}.
+
 -record(state, {
           category :: term(), % the category identifier
           settings :: settings(), % the category settings
@@ -115,7 +127,9 @@
           work_stats :: aequitas_work_stats:t(),
           %%
           work_stats_pid :: pid(),
-          work_stats_mon :: reference()
+          work_stats_mon :: reference(),
+          %%
+          coll_limiter :: coll_limiter()
          }).
 -type state() :: #state{}.
 
@@ -126,17 +140,14 @@
 
 -type setting_opt() ::
         {max_window_size, pos_integer() | infinity} |
-        {max_window_duration, pos_integer() | infinity}.
--export_type([setting_opt/0]).
-
--type overridable_setting_opt() ::
+        {max_window_duration, pos_integer() | infinity} |
         {iqr_factor, number()} |
-        {max_collective_rate, non_neg_integer() | infinity}.
--export_type([overridable_setting_opt/0]).
+        {max_collective_rate, non_neg_integer()}.
+-export_type([setting_opt/0]).
 
 -type ask_opt() ::
         {weight, pos_integer()} |
-        {override, overridable_setting_opt()} |
+        {iqr_factor, number()} |
         return_stats.
 -export_type([ask_opt/0]).
 
@@ -215,18 +226,27 @@ init({Parent, [Category]}) ->
             WorkSharesTable = ets:new(work_shares, [protected, {read_concurrency,true}]),
             {ok, WorkStatsPid} = aequitas_work_stats:start(self(), WorkSharesTable),
             proc_lib:init_ack(Parent, {ok, self()}),
+
             State =
                 #state{
                    category = Category,
                    settings = Settings,
+                   %%
                    window = queue:new(),
                    window_size = 0,
+                   %%
                    work_shares_table = WorkSharesTable,
                    work_stats_status = updated,
                    work_stats = #{ nr_of_samples => 0, seconds_to_generate => 0 },
+                   %%
                    work_stats_pid = WorkStatsPid,
-                   work_stats_mon = monitor(process, WorkStatsPid)
+                   work_stats_mon = monitor(process, WorkStatsPid),
+                   %%
+                   coll_limiter = initial_coll_limiter(Settings)
                   },
+
+            _ = schedule_coll_limiter_capacity_replenishment(
+                  ?COLL_LIMITER_UPDATE_PERIOD, erlang:monotonic_time()),
             loop(Parent, Debug, State);
         {error, {already_registered, ExistingPid}} ->
             proc_lib:init_ack(Parent, {error, {already_started, ExistingPid}})
@@ -445,6 +465,12 @@ handle_nonsystem_msg({cast, {report_work_stats, WorkStats}}, Parent, Debug, Stat
     State2 = State#state{ work_stats = WorkStats },
     State3 = set_work_stats_status(updated, State2),
     loop(Parent, Debug, State3);
+handle_nonsystem_msg({replenish_coll_limiter_capacity, LastReplenishTs}, Parent, Debug, State) ->
+    Settings = State#state.settings,
+    CollLimiter = State#state.coll_limiter,
+    UpdatedCollLimiter = replenish_coll_limiter_capacity(LastReplenishTs, Settings, CollLimiter),
+    UpdatedState = State#state{ coll_limiter = UpdatedCollLimiter },
+    loop(Parent, Debug, UpdatedState);
 handle_nonsystem_msg(Msg, _Parent, _Debug, _State) ->
     error({unexpected_msg, Msg}).
 
@@ -473,15 +499,10 @@ parse_ask_opts([return_stats | Next], Acc) ->
     parse_ask_opts(
       Next, Acc#{ return_stats => true }
      );
-parse_ask_opts([{override, {iqr_factor, IqrFactor}} | Next], Acc)
+parse_ask_opts([{iqr_factor, IqrFactor} | Next], Acc)
   when ?is_non_neg_number(IqrFactor) ->
     parse_ask_opts(
       Next, Acc#{ iqr_factor => IqrFactor }
-     );
-parse_ask_opts([{override, {max_collective_rate, MaxCollectiveRate}} | Next], Acc)
-  when ?is_non_neg_integer(MaxCollectiveRate) ->
-    parse_ask_opts(
-      Next, Acc#{ max_collective_rate => MaxCollectiveRate }
      );
 parse_ask_opts([], Acc) ->
     Acc;
@@ -492,14 +513,21 @@ parse_ask_opts(InvalidOpts, _Acc) ->
 
 handle_ask(ActorId, AskParams, State) ->
     Now = erlang:monotonic_time(milli_seconds),
+    Weight = maps:get(weight, AskParams, ?DEFAULT_WORK_WEIGHT),
+    CollLimiter = State#state.coll_limiter,
+
     case has_reached_work_limit(ActorId, AskParams, State) orelse
-         would_reach_max_collective_rate(AskParams, Now, State)
+         check_collective_limit(Weight, CollLimiter)
     of
         true ->
             maybe_return_stats_in_ask(AskParams, rejected, State);
+        no ->
+            State2 = update_coll_limiter_rejections(Weight, State),
+            maybe_return_stats_in_ask(AskParams, rejected, State2);
         _ ->
-            UpdatedState = accept(ActorId, AskParams, Now, State),
-            maybe_return_stats_in_ask(AskParams, accepted, UpdatedState)
+            State3 = accept(ActorId, Weight, Now, State),
+            State4 = update_coll_limiter_acceptances(Weight, State3),
+            maybe_return_stats_in_ask(AskParams, accepted, State4)
     end.
 
 maybe_return_stats_in_ask(#{ return_stats := true }, Status, State) ->
@@ -531,28 +559,12 @@ iqr_factor(AskParams, State) ->
     Settings = State#state.settings,
     maps:get(iqr_factor, AskParams, Settings#settings.iqr_factor).
 
-would_reach_max_collective_rate(AskParams, Timestamp, State) ->
-    MaxCollectiveRate = max_collective_rate(AskParams, State),
-    (MaxCollectiveRate =/= infinity andalso
-     State#state.window_size =/= 0 andalso
-     begin
-         {value, OldestWork} = queue:peek(State#state.window),
-         TimeElapsed = max(1, Timestamp - OldestWork#work.timestamp),
-         HypotheticalCollectiveRate = State#state.window_size * (1000 / TimeElapsed),
-         HypotheticalCollectiveRate >= MaxCollectiveRate
-     end).
-
-max_collective_rate(AskParams, State) ->
-    Settings = State#state.settings,
-    maps:get(max_collective_rate, AskParams, Settings#settings.max_collective_rate).
-
-accept(ActorId, Params, Timestamp, State)
+accept(ActorId, Weight, Timestamp, State)
   when State#state.window_size >= (State#state.settings)#settings.max_window_size ->
     {value, Work} = queue:peek(State#state.window),
     UpdatedState = drop_work(Work, State),
-    accept(ActorId, Params, Timestamp, UpdatedState);
-accept(ActorId, Params, Timestamp, State) ->
-    Weight = maps:get(weight, Params, ?DEFAULT_WORK_WEIGHT),
+    accept(ActorId, Weight, Timestamp, UpdatedState);
+accept(ActorId, Weight, Timestamp, State) ->
     Work =
         #work{
            actor_id = ActorId,
@@ -587,3 +599,95 @@ set_work_stats_status(Status, State) ->
         {updating, outdated} ->
             State
     end.
+
+%%-------------------------------------------------------------------
+%% Internal Functions Definitions - Collective Limiting
+%%-------------------------------------------------------------------
+
+initial_coll_limiter(Settings) ->
+    Capacity =
+        case Settings#settings.max_collective_rate of
+            infinity -> infinity;
+            MaxCollectiveRate -> (MaxCollectiveRate * ?COLL_LIMITER_UPDATE_PERIOD) div 1000
+        end,
+    #coll_limiter{
+       capacity = Capacity,
+       accepted = 0,
+       rejected = 0,
+       desire_history = 0,
+       desire_history_size = 0
+      }.
+
+replenish_coll_limiter_capacity(LastReplenishTs, Settings, CollLimiter) ->
+    Now = erlang:monotonic_time(),
+    UpdatedCapacity =
+        case Settings#settings.max_collective_rate =:= infinity of
+            true ->
+                infinity;
+            _ ->
+                % account for delays
+                BaseRatio = ?COLL_LIMITER_UPDATE_PERIOD / 1000,
+                TimeElapsed = Now - LastReplenishTs,
+                DelayCompensationRatio = TimeElapsed / erlang:convert_time_unit(1, seconds, native),
+                trunc(BaseRatio * DelayCompensationRatio * Settings#settings.max_collective_rate)
+        end,
+    schedule_coll_limiter_capacity_replenishment(?COLL_LIMITER_UPDATE_PERIOD, Now),
+    CollLimiter2 = CollLimiter#coll_limiter{ capacity = UpdatedCapacity },
+    CollLimiter3 = update_coll_limiter_desire_history(CollLimiter2),
+    clear_coll_limiter_counters(CollLimiter3).
+
+schedule_coll_limiter_capacity_replenishment(Interval, LastReplenishTs) ->
+    erlang:send_after(Interval, self(), {replenish_coll_limiter_capacity, LastReplenishTs}).
+
+update_coll_limiter_desire_history(CollLimiter) ->
+    Accepted = CollLimiter#coll_limiter.accepted,
+    Rejected = CollLimiter#coll_limiter.rejected,
+    Desired = Accepted + Rejected,
+    DesireHistory = CollLimiter#coll_limiter.desire_history,
+    DesireHistorySize = CollLimiter#coll_limiter.desire_history_size,
+    UpdatedDesireHistorySize = min(?COLL_LIMITER_MAX_DESIRE_HISTORY_SZ, DesireHistorySize + 1),
+    UpdatedDesireHistory =
+        case UpdatedDesireHistorySize =:= 1 of
+            true ->
+                Desired;
+            _ ->
+                WeightedPrev = (DesireHistory * (UpdatedDesireHistorySize - 1)) div UpdatedDesireHistorySize,
+                WeightedNew = Desired div UpdatedDesireHistorySize,
+                WeightedPrev + WeightedNew
+        end,
+    CollLimiter#coll_limiter{ desire_history = UpdatedDesireHistory,
+                              desire_history_size = UpdatedDesireHistorySize
+                            }.
+
+clear_coll_limiter_counters(CollLimiter) ->
+    CollLimiter#coll_limiter{ accepted = 0, rejected = 0 }.
+
+check_collective_limit(_Weight, CollLimiter)
+  when CollLimiter#coll_limiter.capacity =:= infinity ->
+    yes;
+check_collective_limit(Weight, CollLimiter)
+  when CollLimiter#coll_limiter.accepted + Weight > CollLimiter#coll_limiter.capacity ->
+    no;
+check_collective_limit(_Weight, CollLimiter)
+  when CollLimiter#coll_limiter.desire_history =< CollLimiter#coll_limiter.capacity ->
+    yes;
+check_collective_limit(_Weight, CollLimiter) ->
+    DieThrow = abs(erlang:monotonic_time()) rem CollLimiter#coll_limiter.desire_history,
+    case DieThrow < CollLimiter#coll_limiter.capacity of
+        true -> yes;
+        _ -> no
+    end.
+
+update_coll_limiter_acceptances(Weight, State) ->
+    CollLimiter = State#state.coll_limiter,
+    UpdatedCollLimiter = increment_tuple_field(#coll_limiter.accepted, CollLimiter, +Weight),
+    State#state{ coll_limiter = UpdatedCollLimiter }.
+
+update_coll_limiter_rejections(Weight, State) ->
+    CollLimiter = State#state.coll_limiter,
+    UpdatedCollLimiter = increment_tuple_field(#coll_limiter.rejected, CollLimiter, +Weight),
+    State#state{ coll_limiter = UpdatedCollLimiter }.
+
+increment_tuple_field(Index, Tuple, Incr) ->
+    Value = element(Index, Tuple),
+    setelement(Index, Tuple, Value + Incr).

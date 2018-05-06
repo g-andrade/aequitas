@@ -52,16 +52,18 @@ wait_for_workers(WithMonitors, ResultAcc, SecondsToGenerateAcc) ->
 
 run_worker(Category, Nr, Parent, NrOfCalls) ->
     run_worker_loop(Category, Nr, Parent, NrOfCalls,
-                    erlang:monotonic_time(milli_seconds), 0, #{}, []).
+                    erlang:monotonic_time(), 0, #{}, []).
 
 run_worker_loop(_Category, _Nr, Parent, NrOfCalls, StartTs,
                 Count, CountPerResult, SecondsToGenerateAcc) when Count =:= NrOfCalls ->
-    EndTs = erlang:monotonic_time(milli_seconds),
+    EndTs = erlang:monotonic_time(),
     TimeElapsed = EndTs - StartTs,
+    NativeTimeRatio = erlang:convert_time_unit(1, seconds, native),
+    SecondsElapsed = TimeElapsed / NativeTimeRatio,
     AdjustedCountPerResult =
         maps:map(
           fun (_Result, Count) ->
-                  (Count / (TimeElapsed / 1000))
+                  Count / SecondsElapsed
           end,
           CountPerResult),
     Parent ! {worker_result, self(), AdjustedCountPerResult, SecondsToGenerateAcc};

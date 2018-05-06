@@ -86,17 +86,11 @@ i.e. in calls to either the `:ask/3' or `:async_ask/3' functions.
 <li>`weight': <a href="#work-weighting">Relative weight</a> of the work request
 (default is 1; must be a positive integer)
 </li>
+<li>`iqr_factor': Overrides the `iqr_factor' configured globally for the category;
+its meaning remains the same but it only applies to the work request that overrode it.
+</li>
 <li>`return_stats': Returns work stats, used to detect outliers, together with acceptance status
 (see <a href="#documentation-and-reference">API reference</a>)
-</li>
-<li>`{override, CategorySetting}'
-    Some category settings can be overriden per work request:
-    <ul>
-    <li>`iqr_factor'</li>
-    <li>`max_collective_rate'</li>
-    </ul>
-    Their meaning remains the same as when tweaking categories but will
-    only apply to each work request that overrides them.
 </li>
 </ul>
 
