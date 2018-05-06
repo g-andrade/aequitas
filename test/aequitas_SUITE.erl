@@ -65,7 +65,7 @@ group_params(Group) ->
     [{nr_of_actors, match_suffixed_param(Tokens, "actors")},
      {nr_of_requests_mean, match_suffixed_param(Tokens, "mean")},
      {nr_of_requests_stddev, match_suffixed_param(Tokens, "dev")},
-     {iqr_multiplier, match_suffixed_param(Tokens, "iqr")}
+     {iqr_factor, match_suffixed_param(Tokens, "iqr")}
     ].
 
 match_suffixed_param([H|T], Suffix) ->
@@ -90,11 +90,11 @@ init_per_testcase(TestCase, Config) ->
                  ++ "."
                  ++ atom_to_list(TestCase)),
 
-    IQRMultiplier = proplists:get_value(iqr_multiplier, Config),
+    IqrFactor = proplists:get_value(iqr_factor, Config),
     ok = aequitas:configure(
            Category, [{max_window_size, infinity},
                       {max_window_duration, infinity},
-                      {iqr_multiplier, IQRMultiplier}
+                      {iqr_factor, IqrFactor}
                      ]),
     [{category, Category}
      | Config].
@@ -128,8 +128,8 @@ correct_iqr_enforcement_test([Actor | NextActors], Config, WorkShares) ->
     AskOpts = [return_stats],
 
     {AskResult, Stats} = aequitas:ask(Category, Actor, AskOpts),
-    IQRMultiplier = proplists:get_value(iqr_multiplier, Config),
-    ExpectedAskResult = expected_ask_result(Actor, IQRMultiplier, WorkShares, Stats),
+    IqrFactor = proplists:get_value(iqr_factor, Config),
+    ExpectedAskResult = expected_ask_result(Actor, IqrFactor, WorkShares, Stats),
     ?assertEqual(ExpectedAskResult, AskResult),
 
     UpdatedWorkShares =
@@ -144,11 +144,11 @@ correct_iqr_enforcement_test([Actor | NextActors], Config, WorkShares) ->
 correct_iqr_enforcement_test([], _Config, _WorkShares) ->
     ok.
 
-expected_ask_result(Actor, IQRMultiplier, WorkShares, Stats) ->
+expected_ask_result(Actor, IqrFactor, WorkShares, Stats) ->
     case Stats of
         #{ q3 := Q3, iqr := IQR } ->
            WorkShare = maps:get(Actor, WorkShares, 0),
-           WorkLimit = Q3 + (IQR * IQRMultiplier),
+           WorkLimit = Q3 + (IQR * IqrFactor),
            case WorkShare > WorkLimit of
                true -> rejected;
                false -> accepted
