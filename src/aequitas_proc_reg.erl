@@ -123,7 +123,7 @@ handle_cast(_Cast, State) ->
            {stop, unexpected_info, state()}.
 handle_info({'DOWN', Ref, process, _Pid, _Reason}, State) ->
     Monitors = State#state.monitors,
-    {Name, UpdatedMonitors} = maps:take(Ref, Monitors),
+    {Name, UpdatedMonitors} = maps_take(Ref, Monitors),
     [_] = ets:take(?TABLE, Name),
     UpdatedState = State#state{ monitors = UpdatedMonitors },
     {noreply, UpdatedState};
@@ -137,3 +137,17 @@ terminate(_Reason, _State) ->
 -spec code_change(term(), state(), term()) -> {ok, state()}.
 code_change(_OldVsn, #state{} = State, _Extra) ->
     {ok, State}.
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions
+%% ------------------------------------------------------------------
+
+maps_take(Key, Map) ->
+    % OTP 18 doesn't include maps:take/2
+    case maps:find(Key, Map) of
+        {ok, Value} ->
+            UpdatedMap = maps:remove(Key, Map),
+            {Value, UpdatedMap};
+        error ->
+            error
+    end.
