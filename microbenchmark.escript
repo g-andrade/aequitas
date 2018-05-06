@@ -9,6 +9,7 @@ main([]) ->
     NrOfCalls = 2000000,
     {ok, _} = application:ensure_all_started(aequitas),
     {ok, _} = application:ensure_all_started(sasl),
+    ok = aequitas:start(Category),
     do_it(Category, NrOfWorkers, NrOfCalls).
 
 do_it(Category, NrOfWorkers, NrOfCalls) ->
@@ -17,7 +18,7 @@ do_it(Category, NrOfWorkers, NrOfCalls) ->
     Pids = [spawn(fun () -> run_worker(Category, Nr, Parent, NrOfCallsPerWorker) end)
             || Nr <- lists:seq(1, NrOfWorkers)],
     WithMonitors = [{Pid, monitor(process, Pid)} || Pid <- Pids],
-    io:format("running benchmarks... (~p calls using ~p workers)",
+    io:format("running benchmarks... (~p calls using ~p workers)~n",
               [NrOfCalls, NrOfWorkers]),
     wait_for_workers(WithMonitors, [], []).
 

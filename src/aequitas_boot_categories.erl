@@ -19,7 +19,7 @@
 %% DEALINGS IN THE SOFTWARE.
 
 %% @private
--module(aequitas_cfg).
+-module(aequitas_boot_categories).
 -behaviour(gen_server).
 
 %% ------------------------------------------------------------------
@@ -27,9 +27,7 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [start_link/0,
-    get/2,
-    set/2
+   [start_link/0
    ]).
 
 -ignore_xref(
@@ -55,7 +53,6 @@
 
 -define(CB_MODULE, ?MODULE).
 -define(SERVER, ?MODULE).
--define(TABLE, ?MODULE).
 
 %% ------------------------------------------------------------------
 %% Record and Type Definitions
@@ -71,28 +68,19 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?CB_MODULE, [], []).
 
--spec get(term(), term()) -> term().
-get(Key, Default) ->
-    case ets:lookup(?TABLE, Key) of
-        [{_, Value}] ->
-            Value;
-        [] ->
-            application:get_env(aequitas, Key, Default)
-    end.
-
--spec set(term(), term()) -> true.
-set(Key, Value) ->
-    ets:insert(?TABLE, {Key, Value}).
-
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([]) -> {ok, state()}.
+-spec init([]) -> {ok, state()} | {stop, {atom(), term()}}.
 init([]) ->
-    EtsOpts = [named_table, public, {read_concurrency,true}],
-    _ = ets:new(?TABLE, EtsOpts),
-    {ok, no_state}.
+    try launch_foreknown_categories() of
+        ok ->
+            {ok, no_state}
+    catch
+        Class:Reason ->
+            {stop, {Class, Reason}}
+    end.
 
 -spec handle_call(term(), {pid(), reference()}, state())
         -> {stop, unexpected_call, state()}.
@@ -114,3 +102,23 @@ terminate(_Reason, _State) ->
 -spec code_change(term(), state(), term()) -> {ok, state()}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+%% ------------------------------------------------------------------
+%% gen_server Function Definitions
+%% ------------------------------------------------------------------
+
+launch_foreknown_categories() ->
+    AppConfig = application:get_all_env(aequitas),
+    lists:foreach(
+      fun ({{category, Category}, SettingOpts}) ->
+              case aequitas_category:start(Category, false, SettingOpts) of
+                  {ok, _Pid} -> 
+                      ok;
+                  {error, Reason} ->
+                      error(#{ category => Category,
+                               reason => Reason })
+              end;
+          ({_, _}) ->
+              ok
+      end,
+      AppConfig).

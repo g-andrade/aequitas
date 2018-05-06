@@ -35,17 +35,17 @@
 %%-------------------------------------------------------------------
 
 -export(
-   [start_link/1,
+   [start_link/3,
+    start/3,
     ask/3,
     async_ask/3,
-    set_settings/2,
-    validate_settings/1,
+    update_settings/2,
     async_reload_settings/1,
     report_work_stats/2
    ]).
 
 -ignore_xref(
-   [start_link/1
+   [start_link/3
    ]).
 
 %%-------------------------------------------------------------------
@@ -161,13 +161,26 @@
 %% API Function Definitions
 %%-------------------------------------------------------------------
 
--spec start_link(term()) -> {ok, pid()} | {error, {already_started,pid()}}.
+-spec start_link(term(), boolean(), [setting_opt()]) -> {ok, pid()} | {error, {already_started,pid()}}.
 %% @private
-start_link(Category) ->
-    Args = [{self(), [Category]}],
+start_link(Category, SaveSettings, SettingOpts) ->
+    Args = [{self(), [Category, SaveSettings, SettingOpts]}],
     Timeout = infinity,
     Opts = [],
     proc_lib:start_link(?MODULE, init, Args, Timeout, Opts).
+
+-spec start(term(), boolean(), [setting_opt()])
+        -> {ok, pid()} |
+           {error, {invalid_setting_opt | invalid_setting_opts, _}} |
+           {error, {already_started, pid()}}.
+%% @private
+start(Category, SaveSettings, SettingOpts) ->
+    case validate_settings(SettingOpts) of
+        ok ->
+            aequitas_category_sup:start_child([Category, SaveSettings, SettingOpts]);
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 -spec ask(term(), term(), [ask_opt()]) -> Status | {Status, Stats}
              when Status :: accepted | rejected,
@@ -180,14 +193,14 @@ ask(Category, ActorId, Opts) ->
 -spec async_ask(term(), term(), [ask_opt()]) -> {reference(), reference()}.
 %% @private
 async_ask(Category, ActorId, Opts) ->
-    Pid = ensure_server(Category),
     Params = parse_ask_opts(Opts),
+    Pid = whereis_server(Category),
     send_call(Pid, {ask, ActorId, Params}).
 
--spec set_settings(term(), [setting_opt()])
+-spec update_settings(term(), [setting_opt()])
         -> ok | {error, {invalid_setting_opt | invalid_setting_opts, _}}.
 %% @private
-set_settings(Category, SettingOpts) ->
+update_settings(Category, SettingOpts) ->
     case validate_settings(SettingOpts) of
         ok ->
             aequitas_cfg:set({category, Category}, SettingOpts),
@@ -196,20 +209,10 @@ set_settings(Category, SettingOpts) ->
             {error, Reason}
     end.
 
--spec validate_settings([setting_opt()]) -> ok | {error, term()}.
-%% @private
-validate_settings(SettingOpts) ->
-    case parse_settings_opts(SettingOpts) of
-        {ok, _Settings} ->
-            ok;
-        {error, Reason} ->
-            {error, Reason}
-    end.
-
 -spec async_reload_settings(term()) -> ok.
 %% @private
 async_reload_settings(Category) ->
-    Pid = ensure_server(Category),
+    Pid = whereis_server(Category),
     send_cast(Pid, reload_settings).
 
 -spec report_work_stats(pid(), aequitas_work_stats:t()) -> ok.
@@ -223,11 +226,12 @@ report_work_stats(Pid, WorkStats) ->
 
 -spec init({pid(), [term(), ...]}) -> no_return().
 %% @private
-init({Parent, [Category]}) ->
+init({Parent, [Category, SaveSettings, SettingOpts]}) ->
     Debug = sys:debug_options([]),
     Server = server_name(Category),
     case aequitas_proc_reg:register(Server, self()) of
         ok ->
+            _ = SaveSettings andalso aequitas_cfg:set({category, Category}, SettingOpts),
             Settings = load_settings(Category),
             WorkSharesTable = ets:new(work_shares, [protected, {read_concurrency,true}]),
             {ok, WorkStatsPid} = aequitas_work_stats:start(self(), WorkSharesTable),
@@ -286,24 +290,22 @@ system_code_change(State, _Module, _OldVsn, _Extra) ->
 %% Internal Functions Definitions - Initialization and Requests
 %%-------------------------------------------------------------------
 
-ensure_server(Category) ->
+whereis_server(Category) ->
     Server = server_name(Category),
-    case aequitas_proc_reg:whereis(Server) of
-        undefined ->
-            case aequitas_category_sup:start_child([Category]) of
-                {ok, Pid} ->
-                    Pid;
-                {error, {already_started, ExistingPid}} ->
-                    ExistingPid
-            end;
-        Pid ->
-            Pid
+    aequitas_proc_reg:whereis(Server).
+
+-spec validate_settings([setting_opt()]) -> ok | {error, term()}.
+validate_settings(SettingOpts) ->
+    case parse_settings_opts(SettingOpts) of
+        {ok, _Settings} ->
+            ok;
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 -spec reload_settings(term()) -> ok.
-%% @private
 reload_settings(Category) ->
-    Pid = ensure_server(Category),
+    Pid = whereis_server(Category),
     {Tag, Mon} = send_call(Pid, reload_settings),
     wait_call_reply(Tag, Mon).
 
@@ -372,12 +374,19 @@ parse_settings_opts([InvalidOpt | _Next], _Acc) ->
 parse_settings_opts(InvalidOpts, _Acc) ->
     {error, {invalid_setting_opts, InvalidOpts}}.
 
+send_call(undefined, _Call) ->
+    FakeMon = make_ref(),
+    Tag = FakeMon,
+    self() ! {'DOWN', FakeMon, process, undefined, not_running},
+    {FakeMon, Tag};
 send_call(Pid, Call) ->
     Mon = monitor(process, Pid),
     Tag = Mon,
     Pid ! {call, self(), Tag, Call},
     {Tag, Mon}.
 
+send_cast(undefined, _Cast) ->
+    ok;
 send_cast(Pid, Cast) ->
     Pid ! {cast, Cast},
     ok.
@@ -388,7 +397,7 @@ wait_call_reply(Tag, Mon) ->
             demonitor(Mon, [flush]),
             Reply;
         {'DOWN', Mon, process, _Pid, Reason} ->
-            error({category_process_stopped, Reason})
+            error({category_process, Reason})
     end.
 
 %%-------------------------------------------------------------------

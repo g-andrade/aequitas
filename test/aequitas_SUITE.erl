@@ -108,7 +108,7 @@ init_per_testcase(TestCase, Config) ->
                          ++ atom_to_list(TestCase)),
 
             IqrFactor = proplists:get_value(iqr_factor, Config),
-            ok = aequitas:configure(
+            ok = aequitas:start(
                    Category, [{max_window_size, infinity},
                               {max_window_duration, {minutes,10}},
                               {min_actor_count, 1},
@@ -129,7 +129,7 @@ rate_limited_acceptances_test(_Config) ->
         [{min_actor_count, 1 bsl 128}, % disable outlier detection entirely
          {max_collective_rate, ExpectedRate}
         ],
-    ok = aequitas:configure(Category, CategoryOpts),
+    ok = aequitas:start(Category, CategoryOpts),
 
     Self = self(),
     DurationSeconds = 3,
@@ -158,7 +158,7 @@ rate_unlimited_acceptances_test(_Config) ->
         [{min_actor_count, 1 bsl 128}, % disable outlier detection entirely
          {max_collective_rate, infinity}
         ],
-    ok = aequitas:configure(Category, CategoryOpts),
+    ok = aequitas:start(Category, CategoryOpts),
 
     Self = self(),
     DurationSeconds = 3,

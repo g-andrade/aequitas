@@ -1,5 +1,5 @@
 {application, aequitas,
- [{description, "Fair regulator and rate limiter"},
+ [{description, "Fairness regulator and rate limiter"},
   {vsn, git},
   {registered, []},
   {mod, {aequitas_app, []}},

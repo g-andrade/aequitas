@@ -8,7 +8,7 @@
 
 /ˈae̯.kʷi.taːs/
 
-<h3>aequitas - Fair regulator and rate limiter</h3>
+<h3>aequitas - Fairness regulator and rate limiter</h3>
 
 `aequitas' is a fairness regulator library for Erlang/OTP and Elixir, with optional rate limiting capabilities.
 
@@ -21,12 +21,16 @@ It does so by attempting to detect outliers amongst ordinary workloads distribut
 There's a web server handling HTTP requests. We want to ensure misbehaving
 IP addresses don't steal (too much) system capacity from benevolent clients.
 
-As such, before we handle each HTTP request we ask `aequitas' whether
+We'll name our category `http_requests' and start it. Categories and
+actors can be represented by any term.
+
+<pre lang="erlang" class="erlang">
+<![CDATA[ok = aequitas:start(http_requests).]]>
+</pre>
+
+Now, before we handle each HTTP request we ask `aequitas' whether
 an IP address can be granted work. We'll get a reply that's based on the
 statistical distribution of recent work allocations.
-
-We'll name our category `http_requests'. Categories and actors can be
-represented by any term, and the necessary processes are created on demand.
 
 <pre lang="erlang" class="erlang">
 <![CDATA[case aequitas:ask(http_requests, IPAddress) of
@@ -239,18 +243,20 @@ by declaring the overriden settings, per category, in the following fashion:
 % ...
 </pre>
 
+These categories will start on boot if the configuration is valid.
+
 Proper app. configuration reloads that result in calls to
 the application's internal `:config_change/3' callback will trigger
 a reload of settings in each of the relevant category processes.
 
 <h4 id="dynamic-configuration">Dynamic Configuration</h4>
 
-The configuration of specific categories can be tweaked in runtime
-by calling `aequitas:configure/2', e.g.:
+Reconfiguration of running categories can be performed
+by calling `aequitas:reconfigure/2', e.g.:
 
 <pre lang="erlang" class="erlang">
-ok = aequitas:configure(http_requests,
-                        [{max_window_duration, {seconds,10}}]).
+ok = aequitas:reconfigure(http_requests,
+                          [{max_window_duration, {seconds,10}}]).
 </pre>
 
 (Re)configuration performed this way will override the

@@ -25,26 +25,69 @@
 %%-------------------------------------------------------------------
 
 -export(
-   [ask/2,
+   [start/1,
+    start/2,
+    ask/2,
     ask/3,
     async_ask/2,
     async_ask/3,
-    configure/2
+    reconfigure/2
    ]).
 
 -ignore_xref(
-   [ask/2,
+   [start/1,
+    start/2,
+    ask/2,
     ask/3,
     async_ask/2,
     async_ask/3,
-    configure/2
+    reconfigure/2
    ]).
 
 %%-------------------------------------------------------------------
 %% API Function Definitions
 %%-------------------------------------------------------------------
 
-%% @doc Like `:ask/3' but with defaults options
+%% @doc Like `:async_ask/3' but with default options
+%% @see start/2
+%% @see reconfigure/2
+-spec start(Category) -> ok | {error, Reason}
+    when Category :: term(),
+         Reason :: already_started.
+start(Category) ->
+    start(Category, []).
+
+%% @doc Starts handler for `Category'
+%%
+%% <ul>
+%% <li>`Category' can be any term.</li>
+%% <li>`Opts' must be a list of `aequitas_category:setting_opt()' values.</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`ok' in case of success</li>
+%% <li>`{error, Reason}' otherwise</li>
+%% </ul>
+%% @see start/1
+%% @see reconfigure/2
+-spec start(Category, Opts) -> ok | {error, Reason}
+    when Category :: term(),
+         Opts :: [aequitas_category:setting_opt()],
+         Reason :: (already_started |
+                    {invalid_setting_opt, term()} |
+                    {invalid_setting_opts, term()}).
+start(Category, Opts) ->
+    case aequitas_category:start(Category, true, Opts) of
+        {ok, _Pid} ->
+            ok;
+        {error, {already_started, _Pid}} ->
+            {error, already_started};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+%% @doc Like `:ask/3' but with default options
 %% @see ask/3
 %% @see async_ask/3
 %% @see async_ask/2
@@ -80,7 +123,7 @@ ask(Category, ActorId) ->
 ask(Category, ActorId, Opts) ->
     aequitas_category:ask(Category, ActorId, Opts).
 
-%% @doc Like `:async_ask/3' but with defaults options
+%% @doc Like `:async_ask/3' but with default options
 %% @see async_ask/3
 %% @see ask/3
 %% @see ask/2
@@ -133,10 +176,10 @@ async_ask(Category, ActorId, Opts) ->
 %% <li>`ok' in case of success</li>
 %% <li>`{error, Reason}' otherwise</li>
 %% </ul>
--spec configure(Category, SettingOpts)
+-spec reconfigure(Category, SettingOpts)
         -> ok | {error, Reason}
     when Category :: term(),
          SettingOpts :: [aequitas_category:setting_opt()],
          Reason :: {invalid_setting_opt | invalid_setting_opts, term()}.
-configure(Category, SettingOpts) ->
-    aequitas_category:set_settings(Category, SettingOpts).
+reconfigure(Category, SettingOpts) ->
+    aequitas_category:update_settings(Category, SettingOpts).

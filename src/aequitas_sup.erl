@@ -82,5 +82,8 @@ init([]) ->
          #{ id => category_sup,
             start => {aequitas_category_sup, start_link, []},
             type => supervisor
+          },
+         #{ id => boot_categories,
+            start => {aequitas_boot_categories, start_link, []}
           }],
     {ok, {SupFlags, ChildSpecs}}.
