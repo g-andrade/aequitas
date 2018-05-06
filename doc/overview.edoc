@@ -8,7 +8,8 @@
 
 `aequitas' is a fairness regulator for Erlang/OTP and Elixir, with optional rate limiting capabilities.
 
-It intends on allowing fair access to limited external resources, like databases and web services.
+It intends on allowing fair access to limited external resources, like databases and web services,
+amongst distinct actors.
 
 It does so by attempting to detect outliers amongst ordinary workload distributions.
 
