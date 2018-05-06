@@ -32,12 +32,18 @@ all() ->
 
 groups() ->
     [{Group, [parallel], test_cases()}
-     || Group <- ['10actors_20mean_10dev_1.5iqr',
-                  '100actors_200mean_100dev_1.5iqr',
-                  '1000actors_20mean_10dev_2.0iqr',
-                  '10000actors_3mean_0dev_0.5iqr',
-                  '10actors_100mean_20dev_3.0iqr',
-                  '100actors_10mean_0dev_10.0iqr'
+     || Group <- ['10actors_20mean_10dev_1.5iqr_1sync',
+                  '10actors_20mean_10dev_1.5iqr_0sync',
+                  '100actors_200mean_100dev_1.5iqr_1sync',
+                  '100actors_200mean_100dev_1.5iqr_0sync',
+                  '1000actors_20mean_10dev_2.0iqr_1sync',
+                  '1000actors_20mean_10dev_2.0iqr_0sync',
+                  '10000actors_3mean_0dev_0.5iqr_1sync',
+                  '10000actors_3mean_0dev_0.5iqr_0sync',
+                  '10actors_100mean_20dev_3.0iqr_1sync',
+                  '10actors_100mean_20dev_3.0iqr_0sync',
+                  '100actors_10mean_0dev_10.0iqr_1sync',
+                  '100actors_10mean_0dev_10.0iqr_0sync'
                  ]].
 
 test_cases() ->
@@ -65,7 +71,8 @@ group_params(Group) ->
     [{nr_of_actors, match_suffixed_param(Tokens, "actors")},
      {nr_of_requests_mean, match_suffixed_param(Tokens, "mean")},
      {nr_of_requests_stddev, match_suffixed_param(Tokens, "dev")},
-     {iqr_factor, match_suffixed_param(Tokens, "iqr")}
+     {iqr_factor, match_suffixed_param(Tokens, "iqr")},
+     {is_sync, match_suffixed_param(Tokens, "sync") =:= 1}
     ].
 
 match_suffixed_param([H|T], Suffix) ->
@@ -128,7 +135,7 @@ correct_iqr_enforcement_test([Actor | NextActors], Config, WorkShares) ->
     Category = proplists:get_value(category, Config),
     AskOpts = [return_stats],
 
-    {AskResult, Stats} = aequitas:ask(Category, Actor, AskOpts),
+    {AskResult, Stats} = ask(Category, Actor, AskOpts, Config),
     IqrFactor = proplists:get_value(iqr_factor, Config),
     ExpectedAskResult = expected_ask_result(Actor, IqrFactor, WorkShares, Stats),
     ?assertEqual(ExpectedAskResult, AskResult),
@@ -144,6 +151,21 @@ correct_iqr_enforcement_test([Actor | NextActors], Config, WorkShares) ->
     correct_iqr_enforcement_test(NextActors, Config, UpdatedWorkShares);
 correct_iqr_enforcement_test([], _Config, _WorkShares) ->
     ok.
+
+ask(Category, Actor, AskOpts, Config) ->
+    case proplists:get_value(is_sync, Config) of
+        true ->
+            aequitas:ask(Category, Actor, AskOpts);
+        false ->
+            {Tag, Monitor} = aequitas:async_ask(Category, Actor, AskOpts),
+            receive
+                {Tag, Result} ->
+                    demonitor(Monitor, [flush]),
+                    Result;
+                {'DOWN', Monitor, process, _Pid, Reason} ->
+                    error({category_died, Reason})
+            end
+    end.
 
 expected_ask_result(Actor, IqrFactor, WorkShares, Stats) ->
     case Stats of
