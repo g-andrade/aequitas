@@ -48,11 +48,10 @@
 %% @see ask/3
 %% @see async_ask/3
 %% @see async_ask/2
--spec ask(Category, ActorId) -> Status | {Status, Stats}
+-spec ask(Category, ActorId) -> Status
     when Category :: term(),
          ActorId :: term(),
-         Status :: accepted | rejected,
-         Stats :: aequitas_work_stats:t().
+         Status :: accepted | rejected.
 ask(Category, ActorId) ->
     ask(Category, ActorId, []).
 
@@ -101,6 +100,8 @@ async_ask(Category, ActorId) ->
 %% <ul>
 %% <li>`{Tag, accepted}' if work execution as granted</li>
 %% <li>`{Tag, rejected}' if work execution was denied</li>
+%% <li>`{Tag, {accepted, Stats}}' if work execution as granted and stats requested</li>
+%% <li>`{Tag, {rejected, Stats}}' if work execution was denied and stats requested</li>
 %% <li>`{''`DOWN''`, Monitor, process, _Pid, _Reason}' in case of crash</li>
 %% </ul>
 %%
