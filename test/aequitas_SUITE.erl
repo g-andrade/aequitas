@@ -102,11 +102,7 @@ init_per_testcase(TestCase, Config) ->
         undefined ->
             Config;
         Group ->
-            Category = list_to_atom(
-                         atom_to_list(Group)
-                         ++ "."
-                         ++ atom_to_list(TestCase)),
-
+            Category = {Group, TestCase},
             IqrFactor = proplists:get_value(iqr_factor, Config),
             ok = aequitas:start(
                    Category, [{max_window_size, infinity},
@@ -116,6 +112,15 @@ init_per_testcase(TestCase, Config) ->
                              ]),
             [{category, Category}
              | Config]
+    end.
+
+end_per_testcase(_TestCase, Config) ->
+    case proplists:get_value(category, Config) of
+        undefined ->
+            Config;
+        Category ->
+            ok = aequitas:stop(Category),
+            Config
     end.
 
 %% ------------------------------------------------------------------
@@ -168,8 +173,9 @@ rate_unlimited_acceptances_test(_Config) ->
     WorkerMon = monitor(process, WorkerPid),
     receive
         {WorkerPid, CountPerStatus} ->
-            ?assertEqual(error, dict:find(rejected, CountPerStatus)),
-            ok;
+            ?assertEqual(error, dict:find({rejected,outlier}, CountPerStatus)),
+            ?assertEqual(error, dict:find({rejected,rate_limited}, CountPerStatus)),
+            ok = aequitas:stop(Category);
         {'DOWN', WorkerMon, process, _Pid, Reason} ->
             error({worker_died, Reason})
     end.
@@ -226,7 +232,7 @@ correct_iqr_enforcement_grouptest([Actor | NextActors], Config, WorkShares) ->
             accepted ->
                 WorkShare = maps:get(Actor, WorkShares, 0),
                 WorkShares#{ Actor => WorkShare + 1 };
-            rejected ->
+            {rejected,_Reason} ->
                 WorkShares
         end,
     correct_iqr_enforcement_grouptest(NextActors, Config, UpdatedWorkShares);
@@ -254,7 +260,7 @@ expected_ask_result(Actor, IqrFactor, WorkShares, Stats) ->
            WorkShare = maps:get(Actor, WorkShares, 0),
            WorkLimit = Q3 + (IQR * IqrFactor),
            case WorkShare > WorkLimit of
-               true -> rejected;
+               true -> {rejected,outlier};
                false -> accepted
            end;
         #{} ->

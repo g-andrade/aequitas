@@ -27,6 +27,7 @@
 -export(
    [start/1,
     start/2,
+    stop/1,
     ask/2,
     ask/3,
     async_ask/2,
@@ -37,6 +38,7 @@
 -ignore_xref(
    [start/1,
     start/2,
+    stop/1,
     ask/2,
     ask/3,
     async_ask/2,
@@ -50,6 +52,7 @@
 
 %% @doc Like `:async_ask/3' but with default options
 %% @see start/2
+%% @see stop/1
 %% @see reconfigure/2
 -spec start(Category) -> ok | {error, Reason}
     when Category :: term(),
@@ -70,6 +73,7 @@ start(Category) ->
 %% <li>`{error, Reason}' otherwise</li>
 %% </ul>
 %% @see start/1
+%% @see stop/1
 %% @see reconfigure/2
 -spec start(Category, Opts) -> ok | {error, Reason}
     when Category :: term(),
@@ -87,14 +91,35 @@ start(Category, Opts) ->
             {error, Reason}
     end.
 
+%% @doc Stops a `Category' handler
+%%
+%% <ul>
+%% <li>`Category' must correspond to a started handler</li>
+%% </ul>
+%%
+%% Returns:
+%% <ul>
+%% <li>`ok' in case of success</li>
+%% <li>`{error, Reason}' otherwise</li>
+%% </ul>
+%% @see start/1
+%% @see reconfigure/2
+-spec stop(Category) -> ok | {error, Reason}
+    when Category :: term(),
+         Reason :: not_running.
+stop(Category) ->
+    aequitas_category:stop(Category).
+
 %% @doc Like `:ask/3' but with default options
 %% @see ask/3
 %% @see async_ask/3
 %% @see async_ask/2
--spec ask(Category, ActorId) -> Status
+-spec ask(Category, ActorId) -> Status | {error, Reason}
     when Category :: term(),
          ActorId :: term(),
-         Status :: accepted | rejected.
+         Status :: accepted | {rejected, RejectionReason},
+         RejectionReason :: outlier | rate_limited,
+         Reason :: not_running.
 ask(Category, ActorId) ->
     ask(Category, ActorId, []).
 
@@ -114,12 +139,15 @@ ask(Category, ActorId) ->
 %% @see ask/2
 %% @see async_ask/3
 %% @see async_ask/2
--spec ask(Category, ActorId, Opts) -> Status | {Status, Stats}
+-spec ask(Category, ActorId, Opts) -> Status | {Status, Stats} |
+                                      {error, Reason}
     when Category :: term(),
          ActorId :: term(),
          Opts :: [aequitas_category:ask_opt()],
-         Status :: accepted | rejected,
-         Stats :: aequitas_work_stats:t().
+         Status :: accepted | {rejected, RejectionReason},
+         RejectionReason :: outlier | rate_limited,
+         Stats :: aequitas_work_stats:t(),
+         Reason :: not_running.
 ask(Category, ActorId, Opts) ->
     aequitas_category:ask(Category, ActorId, Opts).
 
@@ -142,10 +170,10 @@ async_ask(Category, ActorId) ->
 %% to the calling process in one of the following formats:
 %% <ul>
 %% <li>`{Tag, accepted}' if work execution as granted</li>
-%% <li>`{Tag, rejected}' if work execution was denied</li>
+%% <li>`{Tag, {rejected,_Reason}}' if work execution was denied</li>
 %% <li>`{Tag, {accepted, Stats}}' if work execution as granted and stats requested</li>
-%% <li>`{Tag, {rejected, Stats}}' if work execution was denied and stats requested</li>
-%% <li>`{''`DOWN''`, Monitor, process, _Pid, _Reason}' in case of crash</li>
+%% <li>`{Tag, {{rejected,_Reason}, Stats}}' if work execution was denied and stats requested</li>
+%% <li>`{''`DOWN''`, Monitor, process, _Pid, _Reason}' if the handler stopped</li>
 %% </ul>
 %%
 %% In case of a successful reply, <b>don't forget to clean `Monitor' up</b>,
@@ -176,10 +204,13 @@ async_ask(Category, ActorId, Opts) ->
 %% <li>`ok' in case of success</li>
 %% <li>`{error, Reason}' otherwise</li>
 %% </ul>
+%%
+%% @see start/2
+%% @see stop/1
 -spec reconfigure(Category, SettingOpts)
         -> ok | {error, Reason}
     when Category :: term(),
          SettingOpts :: [aequitas_category:setting_opt()],
-         Reason :: {invalid_setting_opt | invalid_setting_opts, term()}.
+         Reason :: not_running | {invalid_setting_opt | invalid_setting_opts, term()}.
 reconfigure(Category, SettingOpts) ->
     aequitas_category:update_settings(Category, SettingOpts).

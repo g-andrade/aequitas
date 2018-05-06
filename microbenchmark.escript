@@ -38,6 +38,7 @@ wait_for_workers([], ResultAcc, SecondsToGenerateAcc) ->
            avg => lists:sum(SecondsToGenerateAcc) / length(SecondsToGenerateAcc)
          },
     io:format("stats of stats' seconds_to_generate: ~p~n", [StatsOfSecondsToGenerateStats]),
+    ok = aequitas:stop(microbenchmarking),
     erlang:halt();
 wait_for_workers(WithMonitors, ResultAcc, SecondsToGenerateAcc) ->
     receive
@@ -70,6 +71,7 @@ run_worker_loop(_Category, _Nr, Parent, NrOfCalls, StartTs,
     Parent ! {worker_result, self(), AdjustedCountPerResult, SecondsToGenerateAcc};
 run_worker_loop(Category, Nr, Parent, NrOfCalls, StartTs, Count, CountPerResult, SecondsToGenerateAcc) ->
     {Result, Stats} = aequitas:ask(Category, Nr, [return_stats]),
+    true = (Result =/= error),
     UpdatedCountPerResult = maps_increment(Result, +1, CountPerResult),
     SecondsToGenerateStats = maps:get(seconds_to_generate, Stats),
     UpdatedSecondsToGenerateAcc = [SecondsToGenerateStats | SecondsToGenerateAcc],

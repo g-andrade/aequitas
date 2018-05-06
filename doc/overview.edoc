@@ -37,7 +37,7 @@ statistical distribution of recent work allocations.
     accepted ->
         Reply = handle_request(...),
         {200, Reply};
-    rejected ->
+    {rejected, _Reason} ->
         % too many requests!
         {429, <<>>}
 end.]]>

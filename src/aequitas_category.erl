@@ -37,6 +37,7 @@
 -export(
    [start_link/3,
     start/3,
+    stop/1,
     ask/3,
     async_ask/3,
     update_settings/2,
@@ -182,9 +183,18 @@ start(Category, SaveSettings, SettingOpts) ->
             {error, Reason}
     end.
 
--spec ask(term(), term(), [ask_opt()]) -> Status | {Status, Stats}
-             when Status :: accepted | rejected,
-                  Stats :: aequitas_work_stats:t().
+-spec stop(term()) -> ok | {error, not_running}.
+stop(Category) ->
+    Pid = whereis_server(Category),
+    {Tag, Mon} = send_call(Pid, stop),
+    wait_call_reply(Tag, Mon).
+
+-spec ask(term(), term(), [ask_opt()])
+        -> Status | {Status, Stats} | {error, Reason}
+             when Status :: accepted | {rejected, RejectionReason},
+                  RejectionReason :: outlier | rate_limited,
+                  Stats :: aequitas_work_stats:t(),
+                  Reason :: not_running.
 %% @private
 ask(Category, ActorId, Opts) ->
     {Tag, Mon} = async_ask(Category, ActorId, Opts),
@@ -198,7 +208,7 @@ async_ask(Category, ActorId, Opts) ->
     send_call(Pid, {ask, ActorId, Params}).
 
 -spec update_settings(term(), [setting_opt()])
-        -> ok | {error, {invalid_setting_opt | invalid_setting_opts, _}}.
+        -> ok | {error, not_running | {invalid_setting_opt | invalid_setting_opts, _}}.
 %% @private
 update_settings(Category, SettingOpts) ->
     case validate_settings(SettingOpts) of
@@ -303,7 +313,7 @@ validate_settings(SettingOpts) ->
             {error, Reason}
     end.
 
--spec reload_settings(term()) -> ok.
+-spec reload_settings(term()) -> ok | {error, not_running}.
 reload_settings(Category) ->
     Pid = whereis_server(Category),
     {Tag, Mon} = send_call(Pid, reload_settings),
@@ -377,7 +387,7 @@ parse_settings_opts(InvalidOpts, _Acc) ->
 send_call(undefined, _Call) ->
     FakeMon = make_ref(),
     Tag = FakeMon,
-    self() ! {'DOWN', FakeMon, process, undefined, not_running},
+    self() ! {'DOWN', FakeMon, process, undefined, noproc},
     {FakeMon, Tag};
 send_call(Pid, Call) ->
     Mon = monitor(process, Pid),
@@ -396,6 +406,10 @@ wait_call_reply(Tag, Mon) ->
         {Tag, Reply} ->
             demonitor(Mon, [flush]),
             Reply;
+        {'DOWN', Mon, process, _Pid, Reason} when Reason =:= normal;
+                                                  Reason =:= shutdown;
+                                                  Reason =:= noproc ->
+            {error, not_running};
         {'DOWN', Mon, process, _Pid, Reason} ->
             error({category_process, Reason})
     end.
@@ -480,6 +494,9 @@ handle_nonsystem_msg({call, Pid, Tag, reload_settings}, Parent, Debug, State) ->
     UpdatedState = handle_settings_reload(State),
     Pid ! {Tag, ok},
     loop(Parent, Debug, UpdatedState);
+handle_nonsystem_msg({call, Pid, Tag, stop}, _Parent, _Debug, _State) ->
+    Pid ! {Tag, ok},
+    exit(normal);
 handle_nonsystem_msg({cast, reload_settings}, Parent, Debug, State) ->
     UpdatedState = handle_settings_reload(State),
     loop(Parent, Debug, UpdatedState);
@@ -547,10 +564,10 @@ handle_ask(ActorId, AskParams, State) ->
          check_collective_limit(Weight, CollLimiter)
     of
         true ->
-            maybe_return_stats_in_ask(AskParams, rejected, State);
+            maybe_return_stats_in_ask(AskParams, {rejected, outlier}, State);
         no ->
             State2 = update_coll_limiter_rejections(Weight, State),
-            maybe_return_stats_in_ask(AskParams, rejected, State2);
+            maybe_return_stats_in_ask(AskParams, {rejected, rate_limited}, State2);
         _ ->
             State3 = accept(ActorId, Weight, Now, State),
             State4 = update_coll_limiter_acceptances(Weight, State3),
