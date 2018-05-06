@@ -185,6 +185,7 @@ start(Category, SaveSettings, SettingOpts) ->
     end.
 
 -spec stop(term()) -> ok | {error, not_running}.
+%% @private
 stop(Category) ->
     Pid = whereis_server(Category),
     {Tag, Mon} = send_call(Pid, stop),
