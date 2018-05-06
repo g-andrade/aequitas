@@ -84,7 +84,7 @@ before <a href="#outlier-detection">outlier detection</a> is performed
 <li>`{iqr_factor, _}': IQR factor used to detect outlying actors
 among the workload distribution (default is 1.5; must be a non-negative number)
 </li>
-<li>`{max_collective_rate, _}': Enforces a <a href="#collective-rate-limit">collective rate limit</a>,
+<li>`{max_collective_rate, _}': Enforces a <a href="#collective-rate-limiting">collective rate limit</a>,
 per second, on work acceptances (default is infinity; must be a non-negative integer)
 </li>
 </ul>
