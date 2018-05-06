@@ -85,6 +85,8 @@
 -define(COLL_LIMITER_UPDATE_PERIOD, 500). % in milliseconds
 -define(COLL_LIMITER_MAX_DESIRE_HISTORY_SZ, 4).
 
+-define(HIBERNATION_TIMEOUT, 5000).
+
 -define(is_pos_integer(V), (is_integer((V)) andalso ((V) > 0))).
 -define(is_non_neg_integer(V), (is_integer((V)) andalso ((V) >= 0))).
 -define(is_non_neg_number(V), (is_number((V)) andalso ((V) >= 0))).
@@ -405,6 +407,9 @@ loop(Parent, Debug, State) ->
             receive
                 Msg ->
                     handle_msg(Msg, Parent, Debug, State)
+            after
+                5000 ->
+                    hibernate(Parent, Debug, State)
             end;
         {drop, Work} ->
             UpdatedState = drop_work(Work, State),
@@ -417,14 +422,6 @@ loop(Parent, Debug, State) ->
                 WaitTime ->
                     UpdatedState = drop_work(Work, State),
                     loop(Parent, Debug, UpdatedState)
-            end;
-        {hibernate_after, WaitTime} ->
-            receive
-                Msg ->
-                    handle_msg(Msg, Parent, Debug, State)
-            after
-                WaitTime ->
-                    hibernate(Parent, Debug, State)
             end
     end.
 
@@ -447,10 +444,6 @@ loop_action({value, Work}, Settings, _State)
         _ ->
             {drop_after, Work, WaitTime}
     end;
-loop_action(empty, Settings, _State)
-  when Settings#settings.max_window_duration =/= infinity ->
-    IdleTimeout = Settings#settings.max_window_duration,
-    {hibernate_after, IdleTimeout};
 loop_action(_WorkPeek, _Settings, _State) ->
     simple.
 
