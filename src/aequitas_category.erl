@@ -27,6 +27,7 @@
 %% @reference <a target="_parent" href="https://en.wikipedia.org/wiki/Interquartile_range">Interquartile range</a> (Wikipedia)
 
 -module(aequitas_category).
+-compile([native]).
 
 % https://gist.github.com/marcelog/97708058cd17f86326c82970a7f81d40#file-simpleproc-erl
 
