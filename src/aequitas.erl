@@ -134,7 +134,8 @@ ask(Category, ActorId) ->
 %% Returns:
 %% <ul>
 %% <li>`accepted' if work execution was granted</li>
-%% <li>`rejected' if work execution was denied</li>
+%% <li>`{rejected, Reason}' if work execution was denied</li>
+%% <li>`{error, Reason}' if something went wrong</li>
 %% </ul>
 %% @see ask/2
 %% @see async_ask/3
