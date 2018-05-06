@@ -28,10 +28,11 @@
 %% ------------------------------------------------------------------
 
 all() ->
-    [{group, GroupName} || {GroupName, _Options, _TestCases} <- groups()].
+    individual_test_cases()
+    ++ [{group, GroupName} || {GroupName, _Options, _TestCases} <- groups()].
 
 groups() ->
-    [{Group, [parallel], test_cases()}
+    [{Group, [parallel], group_test_cases()}
      || Group <- ['10actors_20mean_10dev_1.5iqr_1sync',
                   '10actors_20mean_10dev_1.5iqr_0sync',
                   '100actors_200mean_100dev_1.5iqr_1sync',
@@ -46,10 +47,15 @@ groups() ->
                   '100actors_10mean_0dev_10.0iqr_0sync'
                  ]].
 
-test_cases() ->
+individual_test_cases() ->
     ModuleInfo = ?MODULE:module_info(),
     {exports, Exports} = lists:keyfind(exports, 1, ModuleInfo),
     [Name || {Name, 1} <- Exports, lists:suffix("_test", atom_to_list(Name))].
+
+group_test_cases() ->
+    ModuleInfo = ?MODULE:module_info(),
+    {exports, Exports} = lists:keyfind(exports, 1, ModuleInfo),
+    [Name || {Name, 1} <- Exports, lists:suffix("_grouptest", atom_to_list(Name))].
 
 %% ------------------------------------------------------------------
 %% Initialization
@@ -91,27 +97,84 @@ match_suffixed_param([H|T], Suffix) ->
     end.
 
 init_per_testcase(TestCase, Config) ->
-    Group = proplists:get_value(group, Config),
-    Category = list_to_atom(
-                 atom_to_list(Group)
-                 ++ "."
-                 ++ atom_to_list(TestCase)),
+    {ok, _} = application:ensure_all_started(aequitas),
+    case proplists:get_value(group, Config) of
+        undefined ->
+            Config;
+        Group ->
+            Category = list_to_atom(
+                         atom_to_list(Group)
+                         ++ "."
+                         ++ atom_to_list(TestCase)),
 
-    IqrFactor = proplists:get_value(iqr_factor, Config),
-    ok = aequitas:configure(
-           Category, [{max_window_size, infinity},
-                      {max_window_duration, {minutes,10}},
-                      {min_actor_count, 1},
-                      {iqr_factor, IqrFactor}
-                     ]),
-    [{category, Category}
-     | Config].
+            IqrFactor = proplists:get_value(iqr_factor, Config),
+            ok = aequitas:configure(
+                   Category, [{max_window_size, infinity},
+                              {max_window_duration, {minutes,10}},
+                              {min_actor_count, 1},
+                              {iqr_factor, IqrFactor}
+                             ]),
+            [{category, Category}
+             | Config]
+    end.
 
 %% ------------------------------------------------------------------
 %% Definition
 %% ------------------------------------------------------------------
 
-correct_iqr_enforcement_test(Config) ->
+rate_limited_acceptances_test(_Config) ->
+    Category = rate_limited_acceptances_test,
+    ExpectedRate = 200,
+    CategoryOpts =
+        [{min_actor_count, 1 bsl 128}, % disable outlier detection entirely
+         {max_collective_rate, ExpectedRate}
+        ],
+    ok = aequitas:configure(Category, CategoryOpts),
+
+    Self = self(),
+    DurationSeconds = 3,
+    Duration = timer:seconds(DurationSeconds),
+    NrOfActors = 100,
+    WorkerPid = spawn(fun () -> rate_limit_test_worker(Self, Category, NrOfActors, Duration) end),
+    WorkerMon = monitor(process, WorkerPid),
+    receive
+        {WorkerPid, CountPerStatus} ->
+            {ok, AcceptedCount} = dict:find(accepted, CountPerStatus),
+            AcceptedRate = AcceptedCount / DurationSeconds,
+            Ratio = AcceptedRate / ExpectedRate,
+            ct:pal("AcceptedRate: ~p", [AcceptedRate]),
+            ct:pal("ExpectedRate: ~p", [ExpectedRate]),
+            ct:pal("Ratio: ~p", [Ratio]),
+            ?assert(Ratio >= 0.95),
+            ?assert(Ratio =< 1.05),
+            ok;
+        {'DOWN', WorkerMon, process, _Pid, Reason} ->
+            error({worker_died, Reason})
+    end.
+
+rate_unlimited_acceptances_test(_Config) ->
+    Category = rate_unlimited_acceptances_test,
+    CategoryOpts =
+        [{min_actor_count, 1 bsl 128}, % disable outlier detection entirely
+         {max_collective_rate, infinity}
+        ],
+    ok = aequitas:configure(Category, CategoryOpts),
+
+    Self = self(),
+    DurationSeconds = 3,
+    Duration = timer:seconds(DurationSeconds),
+    NrOfActors = 100,
+    WorkerPid = spawn(fun () -> rate_limit_test_worker(Self, Category, NrOfActors, Duration) end),
+    WorkerMon = monitor(process, WorkerPid),
+    receive
+        {WorkerPid, CountPerStatus} ->
+            ?assertEqual(error, dict:find(rejected, CountPerStatus)),
+            ok;
+        {'DOWN', WorkerMon, process, _Pid, Reason} ->
+            error({worker_died, Reason})
+    end.
+
+correct_iqr_enforcement_grouptest(Config) ->
     NrOfActors = proplists:get_value(nr_of_actors, Config),
     NrOfRequestsMean = proplists:get_value(nr_of_requests_mean, Config),
     NrOfRequestsStdDev = proplists:get_value(nr_of_requests_stddev, Config),
@@ -125,13 +188,31 @@ correct_iqr_enforcement_test(Config) ->
           [], lists:seq(1, NrOfActors)),
     ShuffledActorRequests =
         lists_shuffle(ActorRequests),
-    correct_iqr_enforcement_test(ShuffledActorRequests, Config, #{}).
+    correct_iqr_enforcement_grouptest(ShuffledActorRequests, Config, #{}).
 
 %% ------------------------------------------------------------------
 %% Internal
 %% ------------------------------------------------------------------
 
-correct_iqr_enforcement_test([Actor | NextActors], Config, WorkShares) ->
+rate_limit_test_worker(Parent, Category, NrOfActors, Duration) ->
+    erlang:send_after(Duration, self(), finished),
+    rate_limit_test_worker_loop(Parent, Category, NrOfActors, dict:new()).
+
+rate_limit_test_worker_loop(Parent, Category, NrOfActors, Acc) ->
+    ActorId = rand:uniform(NrOfActors),
+    {Tag, Mon} = aequitas:async_ask(Category, ActorId),
+    receive
+        finished ->
+            Parent ! {self(), Acc};
+        {Tag, Result} ->
+            demonitor(Mon, [flush]),
+            UpdatedAcc = dict:update_counter(Result, +1, Acc),
+            rate_limit_test_worker_loop(Parent, Category, NrOfActors, UpdatedAcc);
+        {'DOWN', Mon, process, _Pid, Reason} ->
+            exit({category_died, Reason})
+    end.
+
+correct_iqr_enforcement_grouptest([Actor | NextActors], Config, WorkShares) ->
     Category = proplists:get_value(category, Config),
     AskOpts = [return_stats],
 
@@ -148,8 +229,8 @@ correct_iqr_enforcement_test([Actor | NextActors], Config, WorkShares) ->
             rejected ->
                 WorkShares
         end,
-    correct_iqr_enforcement_test(NextActors, Config, UpdatedWorkShares);
-correct_iqr_enforcement_test([], _Config, _WorkShares) ->
+    correct_iqr_enforcement_grouptest(NextActors, Config, UpdatedWorkShares);
+correct_iqr_enforcement_grouptest([], _Config, _WorkShares) ->
     ok.
 
 ask(Category, Actor, AskOpts, Config) ->
