@@ -1,5 +1,5 @@
 {application, aequitas,
- [{description, "An OTP application"},
+ [{description, "Fair regulator and rate limiter"},
   {vsn, git},
   {registered, []},
   {mod, {aequitas_app, []}},
