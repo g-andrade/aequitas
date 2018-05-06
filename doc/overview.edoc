@@ -159,7 +159,7 @@ and if `iqr_factor' is set to a very strict value, it should ultimately result
 in every actor performing at most one request within the period covered by the sliding window.
 
 This contrasts with impartial rate limiting which is the scope of many other libraries,
-whereby the acception/rejection ratios per actor tend to be the same, independently of
+whereby the acceptance/rejection ratios per actor tend to be the same, independently of
 how much work each actor is effectively performing.
 
 <a href="#work-weighing">Work weighing</a> is taken into account when rate limiting.
