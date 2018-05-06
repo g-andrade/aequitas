@@ -145,9 +145,9 @@ rate_limited_acceptances_test(_Config) ->
             ct:pal("AcceptedRate: ~p", [AcceptedRate]),
             ct:pal("ExpectedRate: ~p", [ExpectedRate]),
             ct:pal("Ratio: ~p", [Ratio]),
-            ?assert(Ratio >= 0.90),
-            ?assert(Ratio =< 1.10),
-            ok;
+            ?assert(Ratio >= 0.75),
+            ?assert(Ratio =< 1.25),
+            ok = aequitas:stop(Category);
         {'DOWN', WorkerMon, process, _Pid, Reason} ->
             error({worker_died, Reason})
     end.
