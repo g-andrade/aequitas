@@ -46,7 +46,7 @@
 %% API Function Definitions
 %%-------------------------------------------------------------------
 
--spec to_milliseconds(t()) -> non_neg_integer().
+-spec to_milliseconds(t()) -> {ok, non_neg_integer()} | error.
 %% @private
 to_milliseconds({milliseconds, HowMany}) ->
     to_milliseconds(HowMany, 0);
