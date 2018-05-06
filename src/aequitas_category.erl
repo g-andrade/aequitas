@@ -141,7 +141,7 @@
 
 -type setting_opt() ::
         {max_window_size, pos_integer() | infinity} |
-        {max_window_duration, pos_integer() | infinity} |
+        {max_window_duration, aequitas_time_interval:t() | infinity} |
         {iqr_factor, number()} |
         {max_collective_rate, non_neg_integer()}.
 -export_type([setting_opt/0]).
@@ -328,11 +328,21 @@ parse_settings_opts([{max_window_size, MaxWindowSize} | Next], Acc)
     parse_settings_opts(
       Next, Acc#settings{ max_window_size = MaxWindowSize }
      );
-parse_settings_opts([{max_window_duration, MaxWindowDuration} | Next], Acc)
-  when ?is_pos_integer(MaxWindowDuration); MaxWindowDuration =:= infinity ->
-    parse_settings_opts(
-      Next, Acc#settings{ max_window_duration = MaxWindowDuration }
-     );
+parse_settings_opts([{max_window_duration, MaxWindowDuration} = Opt | Next], Acc) ->
+    case MaxWindowDuration =:= infinity orelse
+         aequitas_time_interval:to_milliseconds(MaxWindowDuration)
+    of
+        true ->
+            parse_settings_opts(
+              Next, Acc#settings{ max_window_duration = MaxWindowDuration }
+             );
+        {ok, Milliseconds} when Milliseconds > 0 ->
+            parse_settings_opts(
+              Next, Acc#settings{ max_window_duration = Milliseconds }
+             );
+        _ ->
+            {error, {invalid_setting_opt, Opt}}
+    end;
 parse_settings_opts([{iqr_factor, IqrFactor} | Next], Acc)
   when ?is_non_neg_number(IqrFactor) ->
     parse_settings_opts(

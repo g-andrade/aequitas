@@ -93,7 +93,7 @@ init_per_testcase(TestCase, Config) ->
     IqrFactor = proplists:get_value(iqr_factor, Config),
     ok = aequitas:configure(
            Category, [{max_window_size, infinity},
-                      {max_window_duration, infinity},
+                      {max_window_duration, {minutes,10}},
                       {iqr_factor, IqrFactor}
                      ]),
     [{category, Category}
