@@ -171,9 +171,9 @@ async_ask(Category, ActorId) ->
 %% to the calling process in one of the following formats:
 %% <ul>
 %% <li>`{Tag, accepted}' if work execution as granted</li>
-%% <li>`{Tag, {rejected,_Reason}}' if work execution was denied</li>
+%% <li>`{Tag, {rejected, Reason}}' if work execution was denied</li>
 %% <li>`{Tag, {accepted, Stats}}' if work execution as granted and stats requested</li>
-%% <li>`{Tag, {{rejected,_Reason}, Stats}}' if work execution was denied and stats requested</li>
+%% <li>`{Tag, {{rejected, Reason}, Stats}}' if work execution was denied and stats requested</li>
 %% <li>`{''`DOWN''`, Monitor, process, _Pid, _Reason}' if the handler stopped</li>
 %% </ul>
 %%
