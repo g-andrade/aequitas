@@ -75,6 +75,7 @@
 
 -define(DEFAULT_MAX_WINDOW_SIZE, 10000).
 -define(DEFAULT_MAX_WINDOW_DURATION, 5000).
+-define(DEFAULT_MIN_ACTOR_COUNT, 30).
 -define(DEFAULT_IQR_FACTOR, 1.5).
 -define(DEFAULT_MAX_COLLECTIVE_RATE, infinity).
 
@@ -95,6 +96,7 @@
 -record(settings, {
           max_window_size :: pos_integer() | infinity,
           max_window_duration :: pos_integer() | infinity,
+          min_actor_count :: pos_integer(),
           iqr_factor :: number(),
           max_collective_rate :: non_neg_integer() | infinity
          }).
@@ -142,12 +144,14 @@
 -type setting_opt() ::
         {max_window_size, pos_integer() | infinity} |
         {max_window_duration, aequitas_time_interval:t() | infinity} |
+        {min_actor_count, pos_integer()} |
         {iqr_factor, number()} |
         {max_collective_rate, non_neg_integer()}.
 -export_type([setting_opt/0]).
 
 -type ask_opt() ::
         {weight, pos_integer()} |
+        {min_actor_count, pos_integer()} |
         {iqr_factor, number()} |
         return_stats.
 -export_type([ask_opt/0]).
@@ -238,7 +242,7 @@ init({Parent, [Category]}) ->
                    %%
                    work_shares_table = WorkSharesTable,
                    work_stats_status = updated,
-                   work_stats = #{ nr_of_samples => 0, seconds_to_generate => 0 },
+                   work_stats = #{ actor_count => 0, seconds_to_generate => 0 },
                    %%
                    work_stats_pid = WorkStatsPid,
                    work_stats_mon = monitor(process, WorkStatsPid),
@@ -318,6 +322,7 @@ parse_settings_opts(SettingOpts) ->
     DefaultSettings =
         #settings{ max_window_size = ?DEFAULT_MAX_WINDOW_SIZE,
                    max_window_duration = ?DEFAULT_MAX_WINDOW_DURATION,
+                   min_actor_count = ?DEFAULT_MIN_ACTOR_COUNT,
                    iqr_factor = ?DEFAULT_IQR_FACTOR,
                    max_collective_rate = ?DEFAULT_MAX_COLLECTIVE_RATE
                  },
@@ -343,6 +348,11 @@ parse_settings_opts([{max_window_duration, MaxWindowDuration} = Opt | Next], Acc
         _ ->
             {error, {invalid_setting_opt, Opt}}
     end;
+parse_settings_opts([{min_actor_count, MinActorCount} | Next], Acc)
+  when ?is_pos_integer(MinActorCount) ->
+    parse_settings_opts(
+      Next, Acc#settings{ min_actor_count = MinActorCount }
+     );
 parse_settings_opts([{iqr_factor, IqrFactor} | Next], Acc)
   when ?is_non_neg_number(IqrFactor) ->
     parse_settings_opts(
@@ -510,6 +520,11 @@ parse_ask_opts([return_stats | Next], Acc) ->
     parse_ask_opts(
       Next, Acc#{ return_stats => true }
      );
+parse_ask_opts([{min_actor_count, MinActorCount} | Next], Acc)
+  when ?is_pos_integer(MinActorCount) ->
+    parse_ask_opts(
+      Next, Acc#{ min_actor_count => MinActorCount }
+     );
 parse_ask_opts([{iqr_factor, IqrFactor} | Next], Acc)
   when ?is_non_neg_number(IqrFactor) ->
     parse_ask_opts(
@@ -547,8 +562,10 @@ maybe_return_stats_in_ask(_AskParams, Status, State) ->
     {Status, State}.
 
 has_reached_work_limit(ActorId, AskParams, State) ->
+    Settings = State#state.settings,
+    MinActorCount = maps:get(min_actor_count, AskParams, Settings#settings.min_actor_count),
     case State#state.work_stats of
-        #{ q3 := Q3, iqr := IQR } ->
+        #{ actor_count := ActorCount, q3 := Q3, iqr := IQR } when ActorCount >= MinActorCount ->
             CurrentWorkShare = current_work_share(ActorId, State),
             IqrFactor = iqr_factor(AskParams, State),
             CurrentWorkShare > (Q3 + (IQR * IqrFactor));

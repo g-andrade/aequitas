@@ -65,37 +65,44 @@ Documentation and reference are hosted on <a target="_parent" href="https://hexd
 
 <h4 id="category-tweaking">Category Tweaking</h4>
 
-The following settings can be used to tweak categories, both through
+The following options can be used to tweak categories, both through
 <a href="#static-configuration">static</a> and
 <a href="#dynamic-configuration">dynamic configuration</a>.
 
 <ul>
-<li>`max_window_size': Enforces a ceiling on how many of the last work acceptances
+<li>`{max_window_size, _}': Enforces a ceiling on how many of the last work acceptances
 will be <a href="#work-tracking">tracked</a> (default is 10000; must be a positive integer or infinity)
 </li>
-<li>`max_window_duration': Enforces an eventual expiration of tracked work acceptances
+<li>`{max_window_duration, _}': Enforces an eventual expiration of tracked work acceptances
 (default is `{seconds,5}'; must be of type `aequitas_time_interval:t()' or infinity
 - see <a href="#documentation-and-reference">type reference</a>)
 </li>
-<li>`iqr_factor': IQR factor used to <a href="#outlier-detection">detect outlying actors</a>
+<li>`{min_actor_count, _}': Establishes a minimum number of tracked actors that's required
+before <a href="#outlier-detection">outlier detection</a> is performed
+(default is 30; must be a positive integer)
+</li>
+<li>`{iqr_factor, _}': IQR factor used to detect outlying actors
 among the workload distribution (default is 1.5; must be a non-negative number)
 </li>
-<li>`max_collective_rate': Enforces a <a href="#collective-rate-limit">collective rate limit</a>,
+<li>`{max_collective_rate, _}': Enforces a <a href="#collective-rate-limit">collective rate limit</a>,
 per second, on work acceptances (default is infinity; must be a non-negative integer)
 </li>
 </ul>
 
 <h4 id="work-request-tweaking">Work Request Tweaking</h4>
 
-The following settings can be used to tweak individual work requests,
+The following options can be used to tweak individual work requests,
 i.e. in calls to either the `:ask/3' or `:async_ask/3' functions.
 
 <ul>
-<li>`weight': <a href="#work-weighing">Relative weight</a> of the work request
+<li>`{weight, _}': <a href="#work-weighing">Relative weight</a> of the work request
 (default is 1; must be a positive integer)
 </li>
-<li>`iqr_factor': Overrides the `iqr_factor' configured globally for the category;
-its meaning remains the same but it only applies to the work request that overrode it.
+<li>`{min_actor_count, _}': Overrides the `min_actor_count' configured globally for the category;
+its meaning remains but it only applies to the work request that overrode it
+</li>
+<li>`{iqr_factor, _}': Overrides the `iqr_factor' configured globally for the category;
+its meaning remains but it only applies to the work request that overrode it
 </li>
 <li>`return_stats': Returns the work stats used to detect outliers together with acceptance status
 (see <a href="#documentation-and-reference">API reference</a>)

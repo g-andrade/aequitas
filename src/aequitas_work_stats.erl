@@ -70,7 +70,7 @@
 -type state() :: #state{}.
 
 -type t() ::
-        #{ nr_of_samples => non_neg_integer(),
+        #{ actor_count => non_neg_integer(),
            q1 => number(),
            q2 => number(),
            q3 => number(),
@@ -182,12 +182,12 @@ hibernate(Parent, Debug, State) ->
 
 crunch_work_stats(Samples) ->
     StartTs = erlang:monotonic_time(nano_seconds),
-    NrOfSamples = length(Samples),
-    case NrOfSamples < 3 of
+    ActorCount = length(Samples),
+    case ActorCount < 3 of
         true ->
             % not enough samples
             EndTs = erlang:monotonic_time(nano_seconds),
-            #{ nr_of_samples => NrOfSamples ,
+            #{ actor_count => ActorCount ,
                seconds_to_generate => (EndTs - StartTs) / 1.0e9
              };
         false ->
@@ -196,7 +196,7 @@ crunch_work_stats(Samples) ->
             {Q1, _, _} = median_split(LowerHalf),
             {Q3, _, _} = median_split(UpperHalf),
             EndTs = erlang:monotonic_time(nano_seconds),
-            #{ nr_of_samples => NrOfSamples,
+            #{ actor_count => ActorCount,
                q1 => Q1,
                q2 => Q2,
                q3 => Q3,

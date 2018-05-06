@@ -94,6 +94,7 @@ init_per_testcase(TestCase, Config) ->
     ok = aequitas:configure(
            Category, [{max_window_size, infinity},
                       {max_window_duration, {minutes,10}},
+                      {min_actor_count, 1},
                       {iqr_factor, IqrFactor}
                      ]),
     [{category, Category}
