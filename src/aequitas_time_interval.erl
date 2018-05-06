@@ -49,7 +49,7 @@
 -spec to_milliseconds(t()) -> {ok, non_neg_integer()} | error.
 %% @private
 to_milliseconds({milliseconds, HowMany}) ->
-    to_milliseconds(HowMany, 0);
+    to_milliseconds(HowMany, 1);
 to_milliseconds({seconds, HowMany}) ->
     to_milliseconds(HowMany, 1000);
 to_milliseconds({minutes, HowMany}) ->
