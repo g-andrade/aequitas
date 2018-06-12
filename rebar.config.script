@@ -1,0 +1,10 @@
+% vim: set ft=erlang:
+try hipe:module_info() of
+    [_|_] ->
+        {_, ErlOpts} = lists:keyfind(erl_opts, 1, CONFIG),
+        Tuple = {d,'HIPE_SUPPORTED'},
+        lists:keystore(erl_opts, 1, CONFIG, {erl_opts, [Tuple|ErlOpts]})
+catch
+    error:undef ->
+        CONFIG
+end.
