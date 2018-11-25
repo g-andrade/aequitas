@@ -128,17 +128,12 @@ end_per_testcase(_TestCase, Config) ->
 %% ------------------------------------------------------------------
 
 static_configuration_test(_Config) ->
-    _ = application:stop(aequitas),
-    clear_application_env(aequitas),
-    _ = application:load(aequitas),
-
+    % @see test/etc/sys.config
+    NonAtomCategory = {static_configuration, non_atom_category},
     CategoryA = static_configuration_categoryA,
     CategoryB = static_configuration_categoryB,
     CategoryC = static_configuration_categoryC,
-    application:set_env(aequitas, {category,CategoryA}, [{max_window_size,10}]),
-    application:set_env(aequitas, {category,CategoryB}, [{max_window_size,42}]),
-    ok = application:start(aequitas),
-
+    ?assertEqual({ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)),
     ?assertEqual({ok, 10}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
     ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
     ?assertEqual({error, noproc}, aequitas_category:get_current_setting(CategoryC, max_window_size)).
