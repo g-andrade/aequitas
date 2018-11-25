@@ -21,18 +21,18 @@ $(REBAR3):
 	wget $(REBAR3_URL) || curl -Lo rebar3 $(REBAR3_URL)
 	@chmod a+x rebar3
 
-clean:
+clean: $(REBAR3)
 	@$(REBAR3) clean
 
 check: dialyzer xref
 
-dialyzer:
+dialyzer: $(REBAR3)
 	@$(REBAR3) dialyzer
 
-xref:
+xref: $(REBAR3)
 	@$(REBAR3) xref
 
-test:
+test: $(REBAR3)
 	@$(REBAR3) as test ct
 
 travis_test: test check
@@ -40,13 +40,13 @@ travis_test: test check
 cover: test
 	@$(REBAR3) as test cover
 
-console:
+console $(REBAR3):
 	@$(REBAR3) as development shell --apps aequitas
 
-microbenchmark:
+microbenchmark $(REBAR3):
 	@$(REBAR3) as development shell --script microbenchmark.escript
 
-doc:
+doc: $(REBAR3)
 	@$(REBAR3) edoc
 
 README.md: doc
@@ -58,6 +58,6 @@ README.md: doc
 	@tail -n  2  <"README.md_" >>"README.md"
 	@rm "README.md_"
 
-publish:
+publish: $(REBAR3)
 	@$(REBAR3) hex publish
 	@$(REBAR3) hex docs
