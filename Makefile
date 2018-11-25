@@ -44,10 +44,10 @@ travis_test: test check
 cover: test
 	@$(REBAR3) as test cover
 
-console $(REBAR3):
+console: $(REBAR3)
 	@$(REBAR3) as development shell --apps aequitas
 
-microbenchmark $(REBAR3):
+microbenchmark: $(REBAR3)
 	@$(REBAR3) as development shell --script microbenchmark.escript
 
 doc: $(REBAR3)
