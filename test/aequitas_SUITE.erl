@@ -129,10 +129,8 @@ end_per_testcase(_TestCase, Config) ->
 
 static_configuration_test(_Config) ->
     _ = application:stop(aequitas),
-    _ = application:unload(aequitas),
-
-    ok = application:load(aequitas),
     clear_application_env(aequitas),
+    _ = application:load(aequitas),
 
     CategoryA = static_configuration_categoryA,
     CategoryB = static_configuration_categoryB,
