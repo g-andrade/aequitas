@@ -28,8 +28,8 @@
 
 -export(
    [start_link/0,
-    get/2,
-    set/2
+    category_get/2,
+    category_set/2
    ]).
 
 -ignore_xref(
@@ -71,18 +71,25 @@
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?CB_MODULE, [], []).
 
--spec get(term(), term()) -> term().
-get(Key, Default) ->
-    case ets:lookup(?TABLE, Key) of
-        [{_, Value}] ->
-            Value;
+-spec category_get(term(), [aequitas_category:setting_opt()]) -> [aequitas_category:setting_opt()].
+category_get(Category, DefaultSettingOpts) ->
+    DynamicKey = dynamic_category_key(Category),
+    case ets:lookup(?TABLE, DynamicKey) of
+        [{DynamicKey, DynamicSettingOpts}] ->
+            DynamicSettingOpts;
         [] ->
-            application:get_env(aequitas, Key, Default)
+            case application:get_env(aequitas, categories, #{}) of
+                #{ Category := StaticSettingOpts } ->
+                    StaticSettingOpts;
+                #{} ->
+                    DefaultSettingOpts
+            end
     end.
 
--spec set(term(), term()) -> true.
-set(Key, Value) ->
-    ets:insert(?TABLE, {Key, Value}).
+-spec category_set(term(), [aequitas_category:setting_opt()]) -> true.
+category_set(Category, SettingOpts) ->
+    Key = dynamic_category_key(Category),
+    ets:insert(?TABLE, {Key, SettingOpts}).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Definitions
@@ -114,3 +121,11 @@ terminate(_Reason, _State) ->
 -spec code_change(term(), state(), term()) -> {ok, state()}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+%% ------------------------------------------------------------------
+%% Internal Function Definitions
+%% ------------------------------------------------------------------
+
+-spec dynamic_category_key(term()) -> {category, term()}.
+dynamic_category_key(Category) ->
+    {category, Category}.

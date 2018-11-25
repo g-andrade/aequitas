@@ -37,7 +37,7 @@
    ]).
 
 %%-------------------------------------------------------------------
-%% API Function Exports
+%% application Function Definitions
 %%-------------------------------------------------------------------
 
 -spec start(application:start_type(), term()) -> {ok, pid()}.
@@ -49,19 +49,7 @@ stop(_State) ->
     ok.
 
 -spec config_change([{term(), term()}], [{term(), term()}], [term()]) -> ok.
-config_change(Changed, New, Removed) ->
-    lists:foreach(
-      fun ({{category, Category}, _SettingOpts}) ->
-              aequitas_category:async_reload_settings(Category);
-          ({_, _}) ->
-              ok
-      end,
-      Changed ++ New),
-
-    lists:foreach(
-      fun ({category, Category}) ->
-              aequitas_category:async_reload_settings(Category);
-          (_) ->
-              ok
-      end,
-      Removed).
+config_change(Changed, New, Removed) when Changed =/= []; New =/= []; Removed =/= [] ->
+    aequitas_category_sup:async_reload_settings_in_children();
+config_change(_Changed, _New, _Removed) ->
+    ok.

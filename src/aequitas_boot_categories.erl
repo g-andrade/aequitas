@@ -104,21 +104,39 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %% ------------------------------------------------------------------
-%% gen_server Function Definitions
+%% Internal Function Definitions
 %% ------------------------------------------------------------------
 
+-spec launch_foreknown_categories() -> ok | no_return().
 launch_foreknown_categories() ->
     AppConfig = application:get_all_env(aequitas),
     lists:foreach(
-      fun ({{category, Category}, SettingOpts}) ->
-              case aequitas_category:start(Category, false, SettingOpts) of
-                  {ok, _Pid} -> 
-                      ok;
-                  {error, Reason} ->
-                      error(#{ category => Category,
-                               reason => Reason })
-              end;
-          ({_, _}) ->
+      fun ({categories, SettingOptsPerCategory}) ->
+              launch_foreknown_categories(SettingOptsPerCategory);
+          ({{category, Category}, _SettingOpts}) ->
+              % legacy format which is not compatible with releases
+              % (nor does it respect the documented sys.config
+              %  constraints - all keys must be atoms)
+              error({release_incompatible_static_configuration, Category});
+          ({_Key, _Value}) ->
               ok
       end,
       AppConfig).
+
+-spec launch_foreknown_categories(#{ term() => [aequitas_category:setting_opt()] }) -> ok | no_return().
+launch_foreknown_categories(SettingOptsPerCategory) when is_map(SettingOptsPerCategory) ->
+    lists:foreach(
+      fun ({Category, SettingOpts}) ->
+              launch_foreknown_category(Category, SettingOpts)
+      end,
+      maps:to_list(SettingOptsPerCategory)).
+
+-spec launch_foreknown_category(term(), [aequitas_category:setting_opt()]) -> ok | no_return().
+launch_foreknown_category(Category, SettingOpts) ->
+    case aequitas_category:start(Category, false, SettingOpts) of
+        {ok, _Pid} ->
+            ok;
+        {error, Reason} ->
+            error(#{ category => Category,
+                     reason => Reason })
+    end.

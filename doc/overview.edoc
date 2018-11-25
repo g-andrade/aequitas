@@ -229,13 +229,13 @@ by declaring the overriden settings, per category, in the following fashion:
 <pre lang="erlang" class="erlang">
 % ...
  {aequitas,
-  [{{category, http_requests},
-    [{max_window_duration, {seconds,10}} % Override default 5s to 10s
-    ]},
+  [{categories,
+   #{ http_requests =>
+        [{max_window_duration, {seconds,10}}] % Override default 5s to 10s
 
-   {{category, rare_ftp_requests},
-    [{max_window_size, 100} % Only track up to the last 100 acceptances
-    ]}
+      rare_ftp_requests =>
+        [{max_window_size, 100}] % Only track up to the last 100 acceptances
+   }}
   ]}
 % ...
 </pre>

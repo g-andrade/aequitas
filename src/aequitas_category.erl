@@ -224,16 +224,15 @@ async_ask(Category, ActorId, Opts) ->
 update_settings(Category, SettingOpts) ->
     case validate_settings(SettingOpts) of
         ok ->
-            aequitas_cfg:set({category, Category}, SettingOpts),
+            aequitas_cfg:category_set(Category, SettingOpts),
             reload_settings(Category);
         {error, Reason} ->
             {error, Reason}
     end.
 
--spec async_reload_settings(term()) -> ok.
+-spec async_reload_settings(pid()) -> ok.
 %% @private
-async_reload_settings(Category) ->
-    Pid = whereis_server(Category),
+async_reload_settings(Pid) ->
     send_cast(Pid, reload_settings).
 
 -spec report_work_stats(pid(), aequitas_work_stats:t()) -> ok.
@@ -269,7 +268,7 @@ init({Parent, [Category, SaveSettings, SettingOpts]}) ->
     Server = server_name(Category),
     case aequitas_proc_reg:register(Server, self()) of
         ok ->
-            _ = SaveSettings andalso aequitas_cfg:set({category, Category}, SettingOpts),
+            _ = SaveSettings andalso aequitas_cfg:category_set(Category, SettingOpts),
             Settings = load_settings(Category),
             WorkSharesTable = ets:new(work_shares, [protected, {read_concurrency,true}]),
             {ok, WorkStatsPid} = aequitas_work_stats:start(self(), WorkSharesTable),
@@ -351,7 +350,7 @@ server_name(Category) ->
     {?MODULE, Category}.
 
 load_settings(Category) ->
-    SettingOpts = aequitas_cfg:get({category, Category}, []),
+    SettingOpts = aequitas_cfg:category_get(Category, []),
     case parse_settings_opts(SettingOpts) of
         {ok, Settings} ->
             Settings;

@@ -28,7 +28,8 @@
 
 -export(
    [start_link/0,
-    start_child/1
+    start_child/1,
+    async_reload_settings_in_children/0
    ]).
 
 -ignore_xref(
@@ -60,11 +61,21 @@ start_link() ->
 start_child(Args) ->
     supervisor:start_child(?SERVER, Args).
 
+-spec async_reload_settings_in_children() -> ok.
+async_reload_settings_in_children() ->
+    lists:foreach(
+      fun ({_Id, undefined, _Type, _Modules}) ->
+              ok;
+          ({_Id, Pid, _Type, _Modules}) ->
+              aequitas_category:async_reload_settings(Pid)
+      end,
+      supervisor:which_children(?SERVER)).
+
 %% ------------------------------------------------------------------
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([]) -> {ok, {supervisor:sup_flags(), 
+-spec init([]) -> {ok, {supervisor:sup_flags(),
                         [supervisor:child_spec(), ...]}}.
 init([]) ->
     SupFlags =
