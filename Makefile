@@ -14,9 +14,11 @@ ifeq ($(REBAR3),)
 	REBAR3 = $(CURDIR)/rebar3
 endif
 
-.PHONY: all build clean check dialyzer xref test travis_test cover console microbenchmark doc publish
+.PHONY: all build clean check dialyzer xref
+.PHONY: test test_ct test_release travis_test cover
+.PHONY: console microbenchmark doc publish
 
-.NOTPARALLEL: check
+.NOTPARALLEL: check test
 
 all: build
 
@@ -38,8 +40,13 @@ dialyzer: $(REBAR3)
 xref: $(REBAR3)
 	@$(REBAR3) xref
 
-test: $(REBAR3)
+test: test_ct test_release
+
+test_ct: $(REBAR3)
 	@$(REBAR3) as test ct
+
+test_release: $(REBAR3)
+	./test_release.sh $(REBAR3)
 
 travis_test: test check
 
