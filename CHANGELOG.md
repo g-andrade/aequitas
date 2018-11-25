@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [UNRELEASED]
+### Added
+- test coverage of release integration
 ### Changed
 - format of static category configuration (no API breakage as the old format was incompatible with releases in any case)
 ### Fixed
