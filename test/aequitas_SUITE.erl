@@ -127,6 +127,24 @@ end_per_testcase(_TestCase, Config) ->
 %% Definition
 %% ------------------------------------------------------------------
 
+static_configuration_test(_Config) ->
+    _ = application:stop(aequitas),
+    _ = application:unload(aequitas),
+
+    ok = application:load(aequitas),
+    clear_application_env(aequitas),
+
+    CategoryA = static_configuration_categoryA,
+    CategoryB = static_configuration_categoryB,
+    CategoryC = static_configuration_categoryC,
+    application:set_env(aequitas, {category,CategoryA}, [{max_window_size,10}]),
+    application:set_env(aequitas, {category,CategoryB}, [{max_window_size,42}]),
+    ok = application:start(aequitas),
+
+    ?assertEqual({ok, 10}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
+    ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
+    ?assertEqual({error, noproc}, aequitas_category:get_current_setting(CategoryC, max_window_size)).
+
 rate_limited_acceptances_test(_Config) ->
     Category = rate_limited_acceptances_test,
     ExpectedRate = 200,
@@ -199,6 +217,13 @@ correct_iqr_enforcement_grouptest(Config) ->
 %% ------------------------------------------------------------------
 %% Internal
 %% ------------------------------------------------------------------
+
+clear_application_env(Application) ->
+    lists:foreach(
+      fun ({Key, _Value}) ->
+              application:unset_env(Application, Key)
+      end,
+      application:get_all_env(Application)).
 
 rate_limit_test_worker(Parent, Category, NrOfActors, Duration) ->
     erlang:send_after(Duration, self(), finished),

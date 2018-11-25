@@ -53,6 +53,12 @@
    [start_link/3
    ]).
 
+-ifdef(TEST).
+-export(
+   [get_current_setting/2
+   ]).
+-endif.
+
 %%-------------------------------------------------------------------
 %% OTP Function Exports
 %%-------------------------------------------------------------------
@@ -234,6 +240,23 @@ async_reload_settings(Category) ->
 %% @private
 report_work_stats(Pid, WorkStats) ->
     send_cast(Pid, {report_work_stats, WorkStats}).
+
+-ifdef(TEST).
+%% @private
+get_current_setting(Category, Key) ->
+    Pid = whereis_server(Category),
+    try sys:get_state(Pid) of
+        State ->
+            Settings = State#state.settings,
+            case Key of
+                max_window_size ->
+                    {ok, Settings#settings.max_window_size}
+            end
+    catch
+        exit:{noproc, {sys,get_state,[Pid]}} ->
+            {error, noproc}
+    end.
+-endif.
 
 %%-------------------------------------------------------------------
 %% OTP Function Definitions
