@@ -138,6 +138,20 @@ static_configuration_test(_Config) ->
     ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
     ?assertEqual({error, noproc}, aequitas_category:get_current_setting(CategoryC, max_window_size)).
 
+overriden_static_configuration_test(_Config) ->
+    Category = static_configuration_categoryA,
+    ?assertEqual({ok, 10}, aequitas_category:get_current_setting(Category, max_window_size)),
+    ok = aequitas:reconfigure(Category, [{max_window_size, 20}]),
+    ?assertEqual({ok, 20}, aequitas_category:get_current_setting(Category, max_window_size)).
+
+dynamic_reconfiguration_test(_Config) ->
+    Category = dynamic_configuration_category,
+    CategoryOpts = [{max_window_size, 23}],
+    ok = aequitas:start(Category, CategoryOpts),
+    ?assertEqual({ok, 23}, aequitas_category:get_current_setting(Category, max_window_size)),
+    ok = aequitas:reconfigure(Category, [{max_window_size, 46}]),
+    ?assertEqual({ok, 46}, aequitas_category:get_current_setting(Category, max_window_size)).
+
 rate_limited_acceptances_test(_Config) ->
     Category = rate_limited_acceptances_test,
     ExpectedRate = 200,
