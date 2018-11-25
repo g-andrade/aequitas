@@ -18,7 +18,7 @@
 %% FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 %% DEALINGS IN THE SOFTWARE.
 
--module(aequitas_SUITE).
+-module(algorithmic_SUITE).
 -compile(export_all).
 
 -include_lib("eunit/include/eunit.hrl").
