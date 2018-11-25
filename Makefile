@@ -41,6 +41,8 @@ xref: $(REBAR3)
 test: $(REBAR3)
 	@$(REBAR3) as test ct
 
+travis_test: test check
+
 cover: test
 	@$(REBAR3) as test cover
 
