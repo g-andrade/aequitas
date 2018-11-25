@@ -8,8 +8,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - test coverage of release integration
 - test coverage of static category configuration
-- test coverage of static category configuration override
-- test coverage of dynamic category configuration
+- test coverage of static category configuration update
+- test coverage of static category configuration dynamic override
+- test coverage of dynamic category (re)configuration
 ### Changed
 - format of static category configuration (no API breakage as the old format was incompatible with releases in any case)
 ### Fixed

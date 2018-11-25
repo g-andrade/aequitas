@@ -138,7 +138,52 @@ static_configuration_test(_Config) ->
     ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
     ?assertEqual({error, noproc}, aequitas_category:get_current_setting(CategoryC, max_window_size)).
 
-overriden_static_configuration_test(_Config) ->
+static_configuration_update_test(_Config) ->
+    NonAtomCategory = {static_configuration, non_atom_category},
+    CategoryA = static_configuration_categoryA,
+    CategoryB = static_configuration_categoryB,
+    ?assertEqual({ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)),
+    ?assertEqual({ok, 10}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
+    ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
+
+    % one category changed
+    EnvBefore1 = full_apps_env(),
+    {ok, SettingOptsPerCategory1} = application:get_env(aequitas, categories),
+    SettingOptsPerCategory2 = SettingOptsPerCategory1#{ CategoryA := [{max_window_size,30}] },
+    ok = application:set_env(aequitas, categories, SettingOptsPerCategory2),
+    ok = application_controller:config_change(EnvBefore1),
+    ?assertEqual({ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)),
+    ?assertEqual({ok, 30}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
+    ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
+
+    % one category changed
+    EnvBefore2 = full_apps_env(),
+    SettingOptsPerCategory3 = SettingOptsPerCategory2#{ CategoryB := [{max_window_size,50}] },
+    ok = application:set_env(aequitas, categories, SettingOptsPerCategory3),
+    ok = application_controller:config_change(EnvBefore2),
+    ?assertEqual({ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)),
+    ?assertEqual({ok, 30}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
+    ?assertEqual({ok, 50}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
+
+    % two categories changed
+    EnvBefore3 = full_apps_env(),
+    SettingOptsPerCategory4 = SettingOptsPerCategory1,
+    ok = application:set_env(aequitas, categories, SettingOptsPerCategory4),
+    ok = application_controller:config_change(EnvBefore3),
+    ?assertEqual({ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)),
+    ?assertEqual({ok, 10}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
+    ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
+
+    % no change at all
+    EnvBefore4 = full_apps_env(),
+    SettingOptsPerCategory5 = SettingOptsPerCategory4,
+    ok = application:set_env(aequitas, categories, SettingOptsPerCategory5),
+    ok = application_controller:config_change(EnvBefore4),
+    ?assertEqual({ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)),
+    ?assertEqual({ok, 10}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
+    ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)).
+
+static_configuration_override_test(_Config) ->
     Category = static_configuration_categoryA,
     ?assertEqual({ok, 10}, aequitas_category:get_current_setting(Category, max_window_size)),
     ok = aequitas:reconfigure(Category, [{max_window_size, 20}]),
@@ -225,12 +270,9 @@ correct_iqr_enforcement_grouptest(Config) ->
 %% Internal
 %% ------------------------------------------------------------------
 
-clear_application_env(Application) ->
-    lists:foreach(
-      fun ({Key, _Value}) ->
-              application:unset_env(Application, Key)
-      end,
-      application:get_all_env(Application)).
+full_apps_env() ->
+    All = [App || {App, _Desc, _Vsn} <- application:which_applications()],
+    [{App, application:get_all_env(App)} || App <- All].
 
 rate_limit_test_worker(Parent, Category, NrOfActors, Duration) ->
     erlang:send_after(Duration, self(), finished),
