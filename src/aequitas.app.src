@@ -1,6 +1,6 @@
 {application, aequitas,
  [{description, "Fairness regulator and rate limiter"},
-  {vsn, git},
+  {vsn, "git"},
   {registered, []},
   {mod, {aequitas_app, []}},
   {applications,
@@ -10,7 +10,6 @@
   {env,[]},
   {modules, []},
 
-  {maintainers, ["Guilherme Andrade"]},
   {licenses, ["MIT"]},
   {links, [{"Github", "https://github.com/g-andrade/aequitas"}]}
  ]}.
