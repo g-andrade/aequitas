@@ -11,5 +11,6 @@
   {modules, []},
 
   {licenses, ["MIT"]},
-  {links, [{"Github", "https://github.com/g-andrade/aequitas"}]}
+  {links, [{"GitHub", "https://github.com/g-andrade/aequitas"},
+           {"GitLab", "https://gitlab.com/g-andrade/aequitas"}]}
  ]}.
