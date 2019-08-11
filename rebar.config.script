@@ -1,6 +1,6 @@
 % vim: set ft=erlang:
 RunningOnCI = os:getenv("RUNNING_ON_CI"),
-try RunningOnCI =/= false andalso hipe:module_info() of
+try RunningOnCI =:= false andalso hipe:module_info() of
     false ->
         CONFIG;
     [_|_] ->
