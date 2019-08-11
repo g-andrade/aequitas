@@ -1,5 +1,8 @@
 % vim: set ft=erlang:
-try hipe:module_info() of
+RunningOnCI = os:getenv("RUNNING_ON_CI"),
+try RunningOnCI =/= false andalso hipe:module_info() of
+    false ->
+        CONFIG;
     [_|_] ->
         {_, ErlOpts} = lists:keyfind(erl_opts, 1, CONFIG),
         Tuple = {d,'HIPE_SUPPORTED'},
