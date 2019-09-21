@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [1.1.1] - 2019-01-19
 ### Fixed
-- unwarranted import of rebar3_hex plugin in library consumers
+- unwarranted import of `rebar3_hex` plugin in library consumers
 
 ## [1.1.0] - 2018-11-25
 ### Added
