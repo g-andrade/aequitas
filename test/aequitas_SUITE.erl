@@ -136,7 +136,7 @@ static_configuration_test(_Config) ->
     ?assertEqual({ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)),
     ?assertEqual({ok, 10}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
     ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
-    ?assertEqual({error, noproc}, aequitas_category:get_current_setting(CategoryC, max_window_size)).
+    ?assertExit({noproc, _}, aequitas_category:get_current_setting(CategoryC, max_window_size)).
 
 static_configuration_update_test(_Config) ->
     NonAtomCategory = {static_configuration, non_atom_category},

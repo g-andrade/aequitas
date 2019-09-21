@@ -244,16 +244,11 @@ report_work_stats(Pid, WorkStats) ->
 %% @private
 get_current_setting(Category, Key) ->
     Pid = whereis_server(Category),
-    try sys:get_state(Pid) of
-        State ->
-            Settings = State#state.settings,
-            case Key of
-                max_window_size ->
-                    {ok, Settings#settings.max_window_size}
-            end
-    catch
-        exit:{noproc, {sys,get_state,[Pid]}} ->
-            {error, noproc}
+    State = sys:get_state(Pid),
+    Settings = State#state.settings,
+    case Key of
+        max_window_size ->
+            {ok, Settings#settings.max_window_size}
     end.
 -endif.
 
