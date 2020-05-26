@@ -5,8 +5,6 @@
     <img src="https://img.shields.io/hexpm/v/aequitas.svg?style=flat"/></a>
 <a target="_parent" href="https://travis-ci.org/g-andrade/aequitas" alt="Travis CI Build Status">
     <img src="https://travis-ci.org/g-andrade/aequitas.png?branch=master"/></a>
-<a target="_parent" href="https://circleci.com/gh/g-andrade/aequitas/tree/master" alt="Circle CI Build Status">
-    <img src="https://circleci.com/gh/g-andrade/aequitas/tree/master.svg?style=svg"/></a>
 
 `aequitas' is a fairness regulator for Erlang/OTP and Elixir, with optional rate limiting capabilities.
 
