@@ -56,7 +56,7 @@ Documentation and reference are hosted on
 
 #### Tested setup
 
-  - Erlang/OTP 18.0 or higher
+  - Erlang/OTP 19.0 or higher
   - rebar3
 
 #### Category Tweaking

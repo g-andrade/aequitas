@@ -60,7 +60,7 @@ Documentation and reference are hosted on <a target="_parent" href="https://hexd
 <h4>Tested setup</h4>
 
 <ul>
-<li>Erlang/OTP 18.0 or higher</li>
+<li>Erlang/OTP 19.0 or higher</li>
 <li>rebar3</li>
 </ul>
 
