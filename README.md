@@ -1,7 +1,7 @@
 # aequitas
 
 [![](https://img.shields.io/hexpm/v/aequitas.svg?style=flat)](https://hex.pm/packages/aequitas)
-[![](https://travis-ci.org/g-andrade/aequitas.png?branch=master)](https://travis-ci.org/g-andrade/aequitas)
+[![](https://github.com/g-andrade/aequitas/workflows/build/badge.svg)](https://github.com/g-andrade/aequitas/actions?query=workflow%3Abuild)
 
 `aequitas` is a fairness regulator for Erlang/OTP and Elixir, with
 optional rate limiting capabilities.

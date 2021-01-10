@@ -3,8 +3,8 @@
 
 <a target="_parent" href="https://hex.pm/packages/aequitas" alt="Hex.pm Package">
     <img src="https://img.shields.io/hexpm/v/aequitas.svg?style=flat"/></a>
-<a target="_parent" href="https://travis-ci.org/g-andrade/aequitas" alt="Travis CI Build Status">
-    <img src="https://travis-ci.org/g-andrade/aequitas.png?branch=master"/></a>
+<a target="_parent" href="https://github.com/g-andrade/aequitas/actions?query=workflow%3Abuild" alt="Travis CI Build Status">
+    <img src="https://github.com/g-andrade/aequitas/workflows/build/badge.svg"/></a>
 
 `aequitas' is a fairness regulator for Erlang/OTP and Elixir, with optional rate limiting capabilities.
 
