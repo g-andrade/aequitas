@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+- OTP 24 to CI targets
+### Removed
+- compatibility with OTP 19
+- compatibility with OTP 20
+- compatibility with OTP 21
+
 ## [1.2.1] - 2020-05-26
 ### Fixed
 - outdated README
