@@ -1,5 +1,8 @@
 # aequitas
 
+**This library is not under active maintenance; if you'd like to perform
+maintenance yourself, feel free to open an issue requesting access.**
+
 [![](https://img.shields.io/hexpm/v/aequitas.svg?style=flat)](https://hex.pm/packages/aequitas)
 [![](https://github.com/g-andrade/aequitas/workflows/build/badge.svg)](https://github.com/g-andrade/aequitas/actions?query=workflow%3Abuild)
 

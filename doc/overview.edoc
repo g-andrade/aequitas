@@ -1,6 +1,8 @@
 @title aequitas
 @doc
 
+<b>This library is not under active maintenance; if you'd like to perform maintenance yourself, feel free to open an issue requesting access.</b>
+
 <a target="_parent" href="https://hex.pm/packages/aequitas" alt="Hex.pm Package">
     <img src="https://img.shields.io/hexpm/v/aequitas.svg?style=flat"/></a>
 <a target="_parent" href="https://github.com/g-andrade/aequitas/actions?query=workflow%3Abuild" alt="Travis CI Build Status">
