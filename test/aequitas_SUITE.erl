@@ -28,24 +28,27 @@
 %% ------------------------------------------------------------------
 
 all() ->
-    individual_test_cases()
-    ++ [{group, GroupName} || {GroupName, _Options, _TestCases} <- groups()].
+    individual_test_cases() ++
+        [{group, GroupName} || {GroupName, _Options, _TestCases} <- groups()].
 
 groups() ->
-    [{Group, [parallel], group_test_cases()}
-     || Group <- ['10actors_20mean_10dev_1.5iqr_1sync',
-                  '10actors_20mean_10dev_1.5iqr_0sync',
-                  '100actors_200mean_100dev_1.5iqr_1sync',
-                  '100actors_200mean_100dev_1.5iqr_0sync',
-                  '1000actors_20mean_10dev_2.0iqr_1sync',
-                  '1000actors_20mean_10dev_2.0iqr_0sync',
-                  '10000actors_3mean_0dev_0.5iqr_1sync',
-                  '10000actors_3mean_0dev_0.5iqr_0sync',
-                  '10actors_100mean_20dev_3.0iqr_1sync',
-                  '10actors_100mean_20dev_3.0iqr_0sync',
-                  '100actors_10mean_0dev_10.0iqr_1sync',
-                  '100actors_10mean_0dev_10.0iqr_0sync'
-                 ]].
+    [
+        {Group, [parallel], group_test_cases()}
+     || Group <- [
+            '10actors_20mean_10dev_1.5iqr_1sync',
+            '10actors_20mean_10dev_1.5iqr_0sync',
+            '100actors_200mean_100dev_1.5iqr_1sync',
+            '100actors_200mean_100dev_1.5iqr_0sync',
+            '1000actors_20mean_10dev_2.0iqr_1sync',
+            '1000actors_20mean_10dev_2.0iqr_0sync',
+            '10000actors_3mean_0dev_0.5iqr_1sync',
+            '10000actors_3mean_0dev_0.5iqr_0sync',
+            '10actors_100mean_20dev_3.0iqr_1sync',
+            '10actors_100mean_20dev_3.0iqr_0sync',
+            '100actors_10mean_0dev_10.0iqr_1sync',
+            '100actors_10mean_0dev_10.0iqr_0sync'
+        ]
+    ].
 
 individual_test_cases() ->
     ModuleInfo = ?MODULE:module_info(),
@@ -63,9 +66,9 @@ group_test_cases() ->
 
 init_per_group(Group, Config) ->
     {ok, _} = application:ensure_all_started(aequitas),
-    [{group, Group}]
-    ++ group_params(Group)
-    ++ Config.
+    [{group, Group}] ++
+        group_params(Group) ++
+        Config.
 
 end_per_group(_Group, Config) ->
     ok = application:stop(aequitas),
@@ -74,14 +77,15 @@ end_per_group(_Group, Config) ->
 group_params(Group) ->
     Str = atom_to_list(Group),
     Tokens = string:tokens(Str, [$_]),
-    [{nr_of_actors, match_suffixed_param(Tokens, "actors")},
-     {nr_of_requests_mean, match_suffixed_param(Tokens, "mean")},
-     {nr_of_requests_stddev, match_suffixed_param(Tokens, "dev")},
-     {iqr_factor, match_suffixed_param(Tokens, "iqr")},
-     {is_sync, match_suffixed_param(Tokens, "sync") =:= 1}
+    [
+        {nr_of_actors, match_suffixed_param(Tokens, "actors")},
+        {nr_of_requests_mean, match_suffixed_param(Tokens, "mean")},
+        {nr_of_requests_stddev, match_suffixed_param(Tokens, "dev")},
+        {iqr_factor, match_suffixed_param(Tokens, "iqr")},
+        {is_sync, match_suffixed_param(Tokens, "sync") =:= 1}
     ].
 
-match_suffixed_param([H|T], Suffix) ->
+match_suffixed_param([H | T], Suffix) ->
     case lists:suffix(Suffix, H) of
         true ->
             ParamStr = lists:sublist(H, length(H) - length(Suffix)),
@@ -105,13 +109,17 @@ init_per_testcase(TestCase, Config) ->
             Category = {Group, TestCase},
             IqrFactor = proplists:get_value(iqr_factor, Config),
             ok = aequitas:start(
-                   Category, [{max_window_size, infinity},
-                              {max_window_duration, {minutes,10}},
-                              {min_actor_count, 1},
-                              {iqr_factor, IqrFactor}
-                             ]),
-            [{category, Category}
-             | Config]
+                Category, [
+                    {max_window_size, infinity},
+                    {max_window_duration, {minutes, 10}},
+                    {min_actor_count, 1},
+                    {iqr_factor, IqrFactor}
+                ]
+            ),
+            [
+                {category, Category}
+                | Config
+            ]
     end.
 
 end_per_testcase(_TestCase, Config) ->
@@ -133,7 +141,9 @@ static_configuration_test(_Config) ->
     CategoryA = static_configuration_categoryA,
     CategoryB = static_configuration_categoryB,
     CategoryC = static_configuration_categoryC,
-    ?assertEqual({ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)),
+    ?assertEqual(
+        {ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)
+    ),
     ?assertEqual({ok, 10}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
     ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
     ?assertExit({noproc, _}, aequitas_category:get_current_setting(CategoryC, max_window_size)).
@@ -142,26 +152,32 @@ static_configuration_update_test(_Config) ->
     NonAtomCategory = {static_configuration, non_atom_category},
     CategoryA = static_configuration_categoryA,
     CategoryB = static_configuration_categoryB,
-    ?assertEqual({ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)),
+    ?assertEqual(
+        {ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)
+    ),
     ?assertEqual({ok, 10}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
     ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
 
     % one category changed
     EnvBefore1 = full_apps_env(),
     {ok, SettingOptsPerCategory1} = application:get_env(aequitas, categories),
-    SettingOptsPerCategory2 = SettingOptsPerCategory1#{ CategoryA := [{max_window_size,30}] },
+    SettingOptsPerCategory2 = SettingOptsPerCategory1#{CategoryA := [{max_window_size, 30}]},
     ok = application:set_env(aequitas, categories, SettingOptsPerCategory2),
     ok = application_controller:config_change(EnvBefore1),
-    ?assertEqual({ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)),
+    ?assertEqual(
+        {ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)
+    ),
     ?assertEqual({ok, 30}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
     ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
 
     % one category changed
     EnvBefore2 = full_apps_env(),
-    SettingOptsPerCategory3 = SettingOptsPerCategory2#{ CategoryB := [{max_window_size,50}] },
+    SettingOptsPerCategory3 = SettingOptsPerCategory2#{CategoryB := [{max_window_size, 50}]},
     ok = application:set_env(aequitas, categories, SettingOptsPerCategory3),
     ok = application_controller:config_change(EnvBefore2),
-    ?assertEqual({ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)),
+    ?assertEqual(
+        {ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)
+    ),
     ?assertEqual({ok, 30}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
     ?assertEqual({ok, 50}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
 
@@ -170,7 +186,9 @@ static_configuration_update_test(_Config) ->
     SettingOptsPerCategory4 = SettingOptsPerCategory1,
     ok = application:set_env(aequitas, categories, SettingOptsPerCategory4),
     ok = application_controller:config_change(EnvBefore3),
-    ?assertEqual({ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)),
+    ?assertEqual(
+        {ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)
+    ),
     ?assertEqual({ok, 10}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
     ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)),
 
@@ -179,7 +197,9 @@ static_configuration_update_test(_Config) ->
     SettingOptsPerCategory5 = SettingOptsPerCategory4,
     ok = application:set_env(aequitas, categories, SettingOptsPerCategory5),
     ok = application_controller:config_change(EnvBefore4),
-    ?assertEqual({ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)),
+    ?assertEqual(
+        {ok, 999}, aequitas_category:get_current_setting(NonAtomCategory, max_window_size)
+    ),
     ?assertEqual({ok, 10}, aequitas_category:get_current_setting(CategoryA, max_window_size)),
     ?assertEqual({ok, 42}, aequitas_category:get_current_setting(CategoryB, max_window_size)).
 
@@ -201,8 +221,10 @@ rate_limited_acceptances_test(_Config) ->
     Category = rate_limited_acceptances_test,
     ExpectedRate = 200,
     CategoryOpts =
-        [{min_actor_count, 1 bsl 128}, % disable outlier detection entirely
-         {max_collective_rate, ExpectedRate}
+        % disable outlier detection entirely
+        [
+            {min_actor_count, 1 bsl 128},
+            {max_collective_rate, ExpectedRate}
         ],
     ok = aequitas:start(Category, CategoryOpts),
 
@@ -210,7 +232,7 @@ rate_limited_acceptances_test(_Config) ->
     DurationSeconds = 3,
     Duration = timer:seconds(DurationSeconds),
     NrOfActors = 100,
-    WorkerPid = spawn(fun () -> rate_limit_test_worker(Self, Category, NrOfActors, Duration) end),
+    WorkerPid = spawn(fun() -> rate_limit_test_worker(Self, Category, NrOfActors, Duration) end),
     WorkerMon = monitor(process, WorkerPid),
     receive
         {WorkerPid, CountPerStatus} ->
@@ -230,8 +252,10 @@ rate_limited_acceptances_test(_Config) ->
 rate_unlimited_acceptances_test(_Config) ->
     Category = rate_unlimited_acceptances_test,
     CategoryOpts =
-        [{min_actor_count, 1 bsl 128}, % disable outlier detection entirely
-         {max_collective_rate, infinity}
+        % disable outlier detection entirely
+        [
+            {min_actor_count, 1 bsl 128},
+            {max_collective_rate, infinity}
         ],
     ok = aequitas:start(Category, CategoryOpts),
 
@@ -239,12 +263,12 @@ rate_unlimited_acceptances_test(_Config) ->
     DurationSeconds = 3,
     Duration = timer:seconds(DurationSeconds),
     NrOfActors = 100,
-    WorkerPid = spawn(fun () -> rate_limit_test_worker(Self, Category, NrOfActors, Duration) end),
+    WorkerPid = spawn(fun() -> rate_limit_test_worker(Self, Category, NrOfActors, Duration) end),
     WorkerMon = monitor(process, WorkerPid),
     receive
         {WorkerPid, CountPerStatus} ->
-            ?assertEqual(error, dict:find({rejected,outlier}, CountPerStatus)),
-            ?assertEqual(error, dict:find({rejected,rate_limited}, CountPerStatus)),
+            ?assertEqual(error, dict:find({rejected, outlier}, CountPerStatus)),
+            ?assertEqual(error, dict:find({rejected, rate_limited}, CountPerStatus)),
             ok = aequitas:stop(Category);
         {'DOWN', WorkerMon, process, _Pid, Reason} ->
             error({worker_died, Reason})
@@ -256,12 +280,16 @@ correct_iqr_enforcement_grouptest(Config) ->
     NrOfRequestsStdDev = proplists:get_value(nr_of_requests_stddev, Config),
     ActorRequests =
         lists:foldl(
-          fun (Actor, Acc) ->
-                  NrOfRequests = max(0, round(NrOfRequestsMean + (NrOfRequestsStdDev * rand:normal()))),
-                  [Actor || _ <- lists:seq(1, NrOfRequests)]
-                  ++ Acc
-          end,
-          [], lists:seq(1, NrOfActors)),
+            fun(Actor, Acc) ->
+                NrOfRequests = max(
+                    0, round(NrOfRequestsMean + (NrOfRequestsStdDev * rand:normal()))
+                ),
+                [Actor || _ <- lists:seq(1, NrOfRequests)] ++
+                    Acc
+            end,
+            [],
+            lists:seq(1, NrOfActors)
+        ),
     ShuffledActorRequests =
         lists_shuffle(ActorRequests),
     correct_iqr_enforcement_grouptest(ShuffledActorRequests, Config, #{}).
@@ -305,8 +333,8 @@ correct_iqr_enforcement_grouptest([Actor | NextActors], Config, WorkShares) ->
         case AskResult of
             accepted ->
                 WorkShare = maps:get(Actor, WorkShares, 0),
-                WorkShares#{ Actor => WorkShare + 1 };
-            {rejected,_Reason} ->
+                WorkShares#{Actor => WorkShare + 1};
+            {rejected, _Reason} ->
                 WorkShares
         end,
     correct_iqr_enforcement_grouptest(NextActors, Config, UpdatedWorkShares);
@@ -330,13 +358,13 @@ ask(Category, Actor, AskOpts, Config) ->
 
 expected_ask_result(Actor, IqrFactor, WorkShares, Stats) ->
     case Stats of
-        #{ q3 := Q3, iqr := IQR } ->
-           WorkShare = maps:get(Actor, WorkShares, 0),
-           WorkLimit = Q3 + (IQR * IqrFactor),
-           case WorkShare > WorkLimit of
-               true -> {rejected,outlier};
-               false -> accepted
-           end;
+        #{q3 := Q3, iqr := IQR} ->
+            WorkShare = maps:get(Actor, WorkShares, 0),
+            WorkLimit = Q3 + (IQR * IqrFactor),
+            case WorkShare > WorkLimit of
+                true -> {rejected, outlier};
+                false -> accepted
+            end;
         #{} ->
             accepted
     end.

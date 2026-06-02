@@ -27,27 +27,31 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [start_link/0,
-    category_get/2,
-    category_set/2
-   ]).
+    [
+        start_link/0,
+        category_get/2,
+        category_set/2
+    ]
+).
 
 -ignore_xref(
-   [start_link/0
-   ]).
+    [start_link/0]
+).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
 
 -export(
-   [init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3
-   ]).
+    [
+        init/1,
+        handle_call/3,
+        handle_cast/2,
+        handle_info/2,
+        terminate/2,
+        code_change/3
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -79,7 +83,7 @@ category_get(Category, DefaultSettingOpts) ->
             DynamicSettingOpts;
         [] ->
             case application:get_env(aequitas, categories, #{}) of
-                #{ Category := StaticSettingOpts } ->
+                #{Category := StaticSettingOpts} ->
                     StaticSettingOpts;
                 #{} ->
                     DefaultSettingOpts
@@ -97,12 +101,12 @@ category_set(Category, SettingOpts) ->
 
 -spec init([]) -> {ok, state()}.
 init([]) ->
-    EtsOpts = [named_table, public, {read_concurrency,true}],
+    EtsOpts = [named_table, public, {read_concurrency, true}],
     _ = ets:new(?TABLE, EtsOpts),
     {ok, no_state}.
 
--spec handle_call(term(), {pid(), reference()}, state())
-        -> {stop, unexpected_call, state()}.
+-spec handle_call(term(), {pid(), reference()}, state()) ->
+    {stop, unexpected_call, state()}.
 handle_call(_Call, _From, State) ->
     {stop, unexpected_call, State}.
 

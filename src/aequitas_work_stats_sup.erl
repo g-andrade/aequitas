@@ -27,13 +27,15 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [start_link/0,
-    start_child/1
-   ]).
+    [
+        start_link/0,
+        start_child/1
+    ]
+).
 
 -ignore_xref(
-   [start_link/0
-   ]).
+    [start_link/0]
+).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Exports
@@ -64,18 +66,20 @@ start_child(Args) ->
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([]) -> {ok, {supervisor:sup_flags(),
-                        [supervisor:child_spec(), ...]}}.
+-spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec(), ...]}}.
 init([]) ->
     SupFlags =
-        #{ strategy => simple_one_for_one,
-           intensity => 10,
-           period => 1
-         },
+        #{
+            strategy => simple_one_for_one,
+            intensity => 10,
+            period => 1
+        },
     ChildSpecs =
-        [#{ id => work_stats,
-            start => {aequitas_work_stats, start_link, []},
-            restart => temporary
-          }
+        [
+            #{
+                id => work_stats,
+                start => {aequitas_work_stats, start_link, []},
+                restart => temporary
+            }
         ],
     {ok, {SupFlags, ChildSpecs}}.

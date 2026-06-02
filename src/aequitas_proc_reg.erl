@@ -27,27 +27,31 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [start_link/0,
-    register/2,
-    whereis/1
-   ]).
+    [
+        start_link/0,
+        register/2,
+        whereis/1
+    ]
+).
 
 -ignore_xref(
-   [start_link/0
-   ]).
+    [start_link/0]
+).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
 
 -export(
-   [init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3
-   ]).
+    [
+        init/1,
+        handle_call/3,
+        handle_cast/2,
+        handle_info/2,
+        terminate/2,
+        code_change/3
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -62,8 +66,8 @@
 %% ------------------------------------------------------------------
 
 -record(state, {
-          monitors :: #{ reference() => term() }
-         }).
+    monitors :: #{reference() => term()}
+}).
 -type state() :: #state{}.
 
 %% ------------------------------------------------------------------
@@ -91,24 +95,25 @@ whereis(Name) ->
 
 -spec init([]) -> {ok, state()}.
 init([]) ->
-    EtsOpts = [named_table, protected, {read_concurrency,true}],
+    EtsOpts = [named_table, protected, {read_concurrency, true}],
     _ = ets:new(?TABLE, EtsOpts),
-    {ok, #state{ monitors = #{} }}.
+    {ok, #state{monitors = #{}}}.
 
--spec handle_call(term(), {pid(),reference()}, state())
-        -> {reply, Reply, state()} |
-           {stop, unexpected_call, state()}
-    when Reply :: ok | {error, {already_registered,pid()}}.
+-spec handle_call(term(), {pid(), reference()}, state()) ->
+    {reply, Reply, state()}
+    | {stop, unexpected_call, state()}
+when
+    Reply :: ok | {error, {already_registered, pid()}}.
 handle_call({register, Name, Pid}, _From, State) ->
     case ets:lookup(?TABLE, Name) of
         [{_, ExistingPid}] ->
             {reply, {error, {already_registered, ExistingPid}}, State};
         [] ->
-            ets:insert(?TABLE, {Name,Pid}),
+            ets:insert(?TABLE, {Name, Pid}),
             NewMonitor = monitor(process, Pid),
             Monitors = State#state.monitors,
-            UpdatedMonitors = Monitors#{ NewMonitor => Name },
-            UpdatedState = State#state{ monitors = UpdatedMonitors },
+            UpdatedMonitors = Monitors#{NewMonitor => Name},
+            UpdatedState = State#state{monitors = UpdatedMonitors},
             {reply, ok, UpdatedState}
     end;
 handle_call(_Call, _From, State) ->
@@ -118,14 +123,14 @@ handle_call(_Call, _From, State) ->
 handle_cast(_Cast, State) ->
     {stop, unexpected_cast, State}.
 
--spec handle_info(term(), state())
-        -> {noreply, state()} |
-           {stop, unexpected_info, state()}.
+-spec handle_info(term(), state()) ->
+    {noreply, state()}
+    | {stop, unexpected_info, state()}.
 handle_info({'DOWN', Ref, process, _Pid, _Reason}, State) ->
     Monitors = State#state.monitors,
     {Name, UpdatedMonitors} = maps_take(Ref, Monitors),
     [_] = ets:take(?TABLE, Name),
-    UpdatedState = State#state{ monitors = UpdatedMonitors },
+    UpdatedState = State#state{monitors = UpdatedMonitors},
     {noreply, UpdatedState};
 handle_info(_Info, State) ->
     {stop, unexpected_info, State}.

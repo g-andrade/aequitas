@@ -27,14 +27,16 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [start_link/0,
-    start_child/1,
-    async_reload_settings_in_children/0
-   ]).
+    [
+        start_link/0,
+        start_child/1,
+        async_reload_settings_in_children/0
+    ]
+).
 
 -ignore_xref(
-   [start_link/0
-   ]).
+    [start_link/0]
+).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Exports
@@ -64,29 +66,33 @@ start_child(Args) ->
 -spec async_reload_settings_in_children() -> ok.
 async_reload_settings_in_children() ->
     lists:foreach(
-      fun ({_Id, undefined, _Type, _Modules}) ->
-              ok;
-          ({_Id, Pid, _Type, _Modules}) ->
-              aequitas_category:async_reload_settings(Pid)
-      end,
-      supervisor:which_children(?SERVER)).
+        fun
+            ({_Id, undefined, _Type, _Modules}) ->
+                ok;
+            ({_Id, Pid, _Type, _Modules}) ->
+                aequitas_category:async_reload_settings(Pid)
+        end,
+        supervisor:which_children(?SERVER)
+    ).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([]) -> {ok, {supervisor:sup_flags(),
-                        [supervisor:child_spec(), ...]}}.
+-spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec(), ...]}}.
 init([]) ->
     SupFlags =
-        #{ strategy => simple_one_for_one,
-           intensity => 10,
-           period => 1
-         },
+        #{
+            strategy => simple_one_for_one,
+            intensity => 10,
+            period => 1
+        },
     ChildSpecs =
-        [#{ id => category,
-            start => {aequitas_category, start_link, []},
-            restart => temporary
-          }
+        [
+            #{
+                id => category,
+                start => {aequitas_category, start_link, []},
+                restart => temporary
+            }
         ],
     {ok, {SupFlags, ChildSpecs}}.

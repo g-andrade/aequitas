@@ -27,14 +27,16 @@
 %%-------------------------------------------------------------------
 
 -export(
-   [start/2,
-    stop/1,
-    config_change/3
-   ]).
+    [
+        start/2,
+        stop/1,
+        config_change/3
+    ]
+).
 
 -ignore_xref(
-   [config_change/3
-   ]).
+    [config_change/3]
+).
 
 %%-------------------------------------------------------------------
 %% application Function Definitions

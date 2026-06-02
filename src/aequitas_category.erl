@@ -47,24 +47,26 @@ to the library; the externally relevant surface is the
 %%-------------------------------------------------------------------
 
 -export(
-   [start_link/3,
-    start/3,
-    stop/1,
-    ask/3,
-    async_ask/3,
-    update_settings/2,
-    async_reload_settings/1,
-    report_work_stats/2
-   ]).
+    [
+        start_link/3,
+        start/3,
+        stop/1,
+        ask/3,
+        async_ask/3,
+        update_settings/2,
+        async_reload_settings/1,
+        report_work_stats/2
+    ]
+).
 
 -ignore_xref(
-   [start_link/3
-   ]).
+    [start_link/3]
+).
 
 -ifdef(TEST).
 -export(
-   [get_current_setting/2
-   ]).
+    [get_current_setting/2]
+).
 -endif.
 
 %%-------------------------------------------------------------------
@@ -72,20 +74,24 @@ to the library; the externally relevant surface is the
 %%-------------------------------------------------------------------
 
 -export(
-   [init/1,
-    system_code_change/4,
-    system_continue/3,
-    system_terminate/4,
-    write_debug/3
-   ]).
+    [
+        init/1,
+        system_code_change/4,
+        system_continue/3,
+        system_terminate/4,
+        write_debug/3
+    ]
+).
 
 -ignore_xref(
-   [init/1,
-    system_code_change/4,
-    system_continue/3,
-    system_terminate/4,
-    write_debug/3
-   ]).
+    [
+        init/1,
+        system_code_change/4,
+        system_continue/3,
+        system_terminate/4,
+        write_debug/3
+    ]
+).
 
 %%-------------------------------------------------------------------
 %% Macro Definitions
@@ -100,7 +106,8 @@ to the library; the externally relevant surface is the
 -define(DEFAULT_WORK_WEIGHT, 1).
 -define(DEFAULT_RETURN_STATS, false).
 
--define(COLL_LIMITER_UPDATE_PERIOD, 500). % in milliseconds
+% in milliseconds
+-define(COLL_LIMITER_UPDATE_PERIOD, 500).
 -define(COLL_LIMITER_MAX_DESIRE_HISTORY_SZ, 4).
 
 -define(HIBERNATION_TIMEOUT, 5000).
@@ -114,73 +121,80 @@ to the library; the externally relevant surface is the
 %%-------------------------------------------------------------------
 
 -record(settings, {
-          max_window_size :: pos_integer() | infinity,
-          max_window_duration :: pos_integer() | infinity,
-          min_actor_count :: pos_integer(),
-          iqr_factor :: number(),
-          max_collective_rate :: non_neg_integer() | infinity
-         }).
+    max_window_size :: pos_integer() | infinity,
+    max_window_duration :: pos_integer() | infinity,
+    min_actor_count :: pos_integer(),
+    iqr_factor :: number(),
+    max_collective_rate :: non_neg_integer() | infinity
+}).
 -type settings() :: #settings{}.
 
 -record(work, {
-          actor_id :: term(),
-          weight :: pos_integer(),
-          timestamp :: integer()
-         }).
+    actor_id :: term(),
+    weight :: pos_integer(),
+    timestamp :: integer()
+}).
 -type work() :: #work{}.
 
 -record(coll_limiter, {
-          capacity :: non_neg_integer() | infinity,
-          accepted :: non_neg_integer(),
-          rejected :: non_neg_integer(),
-          desire_history :: non_neg_integer(),
-          desire_history_size :: non_neg_integer()
-         }).
+    capacity :: non_neg_integer() | infinity,
+    accepted :: non_neg_integer(),
+    rejected :: non_neg_integer(),
+    desire_history :: non_neg_integer(),
+    desire_history_size :: non_neg_integer()
+}).
 -type coll_limiter() :: #coll_limiter{}.
 
 -record(state, {
-          category :: term(), % the category identifier
-          settings :: settings(), % the category settings
-          %%
-          window :: queue:queue(work()), % sliding window
-          window_size :: non_neg_integer(), % queue:len/1 is expensive
-          %%
-          work_shares_table :: ets:tab(),
-          work_stats_status :: updated | outdated | updating,
-          work_stats :: aequitas_work_stats:t(),
-          %%
-          work_stats_pid :: pid(),
-          work_stats_mon :: reference(),
-          %%
-          coll_limiter :: coll_limiter()
-         }).
+    % the category identifier
+    category :: term(),
+    % the category settings
+    settings :: settings(),
+    %%
+
+    % sliding window
+    window :: queue:queue(work()),
+    % queue:len/1 is expensive
+    window_size :: non_neg_integer(),
+    %%
+    work_shares_table :: ets:tab(),
+    work_stats_status :: updated | outdated | updating,
+    work_stats :: aequitas_work_stats:t(),
+    %%
+    work_stats_pid :: pid(),
+    work_stats_mon :: reference(),
+    %%
+    coll_limiter :: coll_limiter()
+}).
 -type state() :: #state{}.
 
 -type ask_params() ::
-        #{ weight => pos_integer(),
-           return_stats => boolean()
-         }.
+    #{
+        weight => pos_integer(),
+        return_stats => boolean()
+    }.
 
 -type setting_opt() ::
-        {max_window_size, pos_integer() | infinity} |
-        {max_window_duration, aequitas_time_interval:t() | infinity} |
-        {min_actor_count, pos_integer()} |
-        {iqr_factor, number()} |
-        {max_collective_rate, non_neg_integer()}.
+    {max_window_size, pos_integer() | infinity}
+    | {max_window_duration, aequitas_time_interval:t() | infinity}
+    | {min_actor_count, pos_integer()}
+    | {iqr_factor, number()}
+    | {max_collective_rate, non_neg_integer()}.
 -export_type([setting_opt/0]).
 
 -type ask_opt() ::
-        {weight, pos_integer()} |
-        {min_actor_count, pos_integer()} |
-        {iqr_factor, number()} |
-        return_stats.
+    {weight, pos_integer()}
+    | {min_actor_count, pos_integer()}
+    | {iqr_factor, number()}
+    | return_stats.
 -export_type([ask_opt/0]).
 
 %%-------------------------------------------------------------------
 %% API Function Definitions
 %%-------------------------------------------------------------------
 
--spec start_link(term(), boolean(), [setting_opt()]) -> {ok, pid()} | {error, {already_started,pid()}}.
+-spec start_link(term(), boolean(), [setting_opt()]) ->
+    {ok, pid()} | {error, {already_started, pid()}}.
 %% @private
 start_link(Category, SaveSettings, SettingOpts) ->
     Args = [{self(), [Category, SaveSettings, SettingOpts]}],
@@ -188,10 +202,10 @@ start_link(Category, SaveSettings, SettingOpts) ->
     Opts = [],
     proc_lib:start_link(?MODULE, init, Args, Timeout, Opts).
 
--spec start(term(), boolean(), [setting_opt()])
-        -> {ok, pid()} |
-           {error, {invalid_setting_opt | invalid_setting_opts, _}} |
-           {error, {already_started, pid()}}.
+-spec start(term(), boolean(), [setting_opt()]) ->
+    {ok, pid()}
+    | {error, {invalid_setting_opt | invalid_setting_opts, _}}
+    | {error, {already_started, pid()}}.
 %% @private
 start(Category, SaveSettings, SettingOpts) ->
     case validate_settings(SettingOpts) of
@@ -208,12 +222,13 @@ stop(Category) ->
     {Tag, Mon} = send_call(Pid, stop),
     wait_call_reply(Tag, Mon).
 
--spec ask(term(), term(), [ask_opt()])
-        -> Status | {Status, Stats} | {error, Reason}
-             when Status :: accepted | {rejected, RejectionReason},
-                  RejectionReason :: outlier | rate_limited,
-                  Stats :: aequitas_work_stats:t(),
-                  Reason :: not_started.
+-spec ask(term(), term(), [ask_opt()]) ->
+    Status | {Status, Stats} | {error, Reason}
+when
+    Status :: accepted | {rejected, RejectionReason},
+    RejectionReason :: outlier | rate_limited,
+    Stats :: aequitas_work_stats:t(),
+    Reason :: not_started.
 %% @private
 ask(Category, ActorId, Opts) ->
     {Tag, Mon} = async_ask(Category, ActorId, Opts),
@@ -226,8 +241,8 @@ async_ask(Category, ActorId, Opts) ->
     Pid = whereis_server(Category),
     send_call(Pid, {ask, ActorId, Params}).
 
--spec update_settings(term(), [setting_opt()])
-        -> ok | {error, not_started | {invalid_setting_opt | invalid_setting_opts, _}}.
+-spec update_settings(term(), [setting_opt()]) ->
+    ok | {error, not_started | {invalid_setting_opt | invalid_setting_opts, _}}.
 %% @private
 update_settings(Category, SettingOpts) ->
     case validate_settings(SettingOpts) of
@@ -272,30 +287,31 @@ init({Parent, [Category, SaveSettings, SettingOpts]}) ->
         ok ->
             _ = SaveSettings andalso aequitas_cfg:category_set(Category, SettingOpts),
             Settings = load_settings(Category),
-            WorkSharesTable = ets:new(work_shares, [protected, {read_concurrency,true}]),
+            WorkSharesTable = ets:new(work_shares, [protected, {read_concurrency, true}]),
             {ok, WorkStatsPid} = aequitas_work_stats:start(self(), WorkSharesTable),
             proc_lib:init_ack(Parent, {ok, self()}),
 
             State =
                 #state{
-                   category = Category,
-                   settings = Settings,
-                   %%
-                   window = queue:new(),
-                   window_size = 0,
-                   %%
-                   work_shares_table = WorkSharesTable,
-                   work_stats_status = updated,
-                   work_stats = #{ actor_count => 0, seconds_to_generate => 0 },
-                   %%
-                   work_stats_pid = WorkStatsPid,
-                   work_stats_mon = monitor(process, WorkStatsPid),
-                   %%
-                   coll_limiter = initial_coll_limiter(Settings)
-                  },
+                    category = Category,
+                    settings = Settings,
+                    %%
+                    window = queue:new(),
+                    window_size = 0,
+                    %%
+                    work_shares_table = WorkSharesTable,
+                    work_stats_status = updated,
+                    work_stats = #{actor_count => 0, seconds_to_generate => 0},
+                    %%
+                    work_stats_pid = WorkStatsPid,
+                    work_stats_mon = monitor(process, WorkStatsPid),
+                    %%
+                    coll_limiter = initial_coll_limiter(Settings)
+                },
 
             _ = schedule_coll_limiter_capacity_replenishment(
-                  ?COLL_LIMITER_UPDATE_PERIOD, erlang:monotonic_time()),
+                ?COLL_LIMITER_UPDATE_PERIOD, erlang:monotonic_time()
+            ),
             loop(Parent, Debug, State);
         {error, {already_registered, ExistingPid}} ->
             proc_lib:init_ack(Parent, {error, {already_started, ExistingPid}})
@@ -357,55 +373,61 @@ load_settings(Category) ->
         {ok, Settings} ->
             Settings;
         {error, Reason} ->
-            error(#{ category => Category, reason => Reason })
+            error(#{category => Category, reason => Reason})
     end.
 
 parse_settings_opts(SettingOpts) ->
     DefaultSettings =
-        #settings{ max_window_size = ?DEFAULT_MAX_WINDOW_SIZE,
-                   max_window_duration = ?DEFAULT_MAX_WINDOW_DURATION,
-                   min_actor_count = ?DEFAULT_MIN_ACTOR_COUNT,
-                   iqr_factor = ?DEFAULT_IQR_FACTOR,
-                   max_collective_rate = ?DEFAULT_MAX_COLLECTIVE_RATE
-                 },
+        #settings{
+            max_window_size = ?DEFAULT_MAX_WINDOW_SIZE,
+            max_window_duration = ?DEFAULT_MAX_WINDOW_DURATION,
+            min_actor_count = ?DEFAULT_MIN_ACTOR_COUNT,
+            iqr_factor = ?DEFAULT_IQR_FACTOR,
+            max_collective_rate = ?DEFAULT_MAX_COLLECTIVE_RATE
+        },
     parse_settings_opts(SettingOpts, DefaultSettings).
 
-parse_settings_opts([{max_window_size, MaxWindowSize} | Next], Acc)
-  when ?is_pos_integer(MaxWindowSize); MaxWindowSize =:= infinity ->
+parse_settings_opts([{max_window_size, MaxWindowSize} | Next], Acc) when
+    ?is_pos_integer(MaxWindowSize); MaxWindowSize =:= infinity
+->
     parse_settings_opts(
-      Next, Acc#settings{ max_window_size = MaxWindowSize }
-     );
+        Next, Acc#settings{max_window_size = MaxWindowSize}
+    );
 parse_settings_opts([{max_window_duration, MaxWindowDuration} = Opt | Next], Acc) ->
-    case MaxWindowDuration =:= infinity orelse
-         aequitas_time_interval:to_milliseconds(MaxWindowDuration)
+    case
+        MaxWindowDuration =:= infinity orelse
+            aequitas_time_interval:to_milliseconds(MaxWindowDuration)
     of
         true ->
             parse_settings_opts(
-              Next, Acc#settings{ max_window_duration = MaxWindowDuration }
-             );
+                Next, Acc#settings{max_window_duration = MaxWindowDuration}
+            );
         {ok, Milliseconds} when Milliseconds > 0 ->
             parse_settings_opts(
-              Next, Acc#settings{ max_window_duration = Milliseconds }
-             );
+                Next, Acc#settings{max_window_duration = Milliseconds}
+            );
         _ ->
             {error, {invalid_setting_opt, Opt}}
     end;
-parse_settings_opts([{min_actor_count, MinActorCount} | Next], Acc)
-  when ?is_pos_integer(MinActorCount) ->
+parse_settings_opts([{min_actor_count, MinActorCount} | Next], Acc) when
+    ?is_pos_integer(MinActorCount)
+->
     parse_settings_opts(
-      Next, Acc#settings{ min_actor_count = MinActorCount }
-     );
-parse_settings_opts([{iqr_factor, IqrFactor} | Next], Acc)
-  when ?is_non_neg_number(IqrFactor) ->
+        Next, Acc#settings{min_actor_count = MinActorCount}
+    );
+parse_settings_opts([{iqr_factor, IqrFactor} | Next], Acc) when
+    ?is_non_neg_number(IqrFactor)
+->
     parse_settings_opts(
-      Next, Acc#settings{ iqr_factor = IqrFactor }
-     );
-parse_settings_opts([{max_collective_rate, MaxCollectiveRate} | Next], Acc)
-  when ?is_non_neg_integer(MaxCollectiveRate);
-       MaxCollectiveRate =:= infinity ->
+        Next, Acc#settings{iqr_factor = IqrFactor}
+    );
+parse_settings_opts([{max_collective_rate, MaxCollectiveRate} | Next], Acc) when
+    ?is_non_neg_integer(MaxCollectiveRate);
+    MaxCollectiveRate =:= infinity
+->
     parse_settings_opts(
-      Next, Acc#settings{ max_collective_rate = MaxCollectiveRate }
-     );
+        Next, Acc#settings{max_collective_rate = MaxCollectiveRate}
+    );
 parse_settings_opts([], Acc) ->
     {ok, Acc};
 parse_settings_opts([InvalidOpt | _Next], _Acc) ->
@@ -435,9 +457,11 @@ wait_call_reply(Tag, Mon) ->
         {Tag, Reply} ->
             demonitor(Mon, [flush]),
             Reply;
-        {'DOWN', Mon, process, _Pid, Reason} when Reason =:= normal;
-                                                  Reason =:= shutdown;
-                                                  Reason =:= noproc ->
+        {'DOWN', Mon, process, _Pid, Reason} when
+            Reason =:= normal;
+            Reason =:= shutdown;
+            Reason =:= noproc
+        ->
             {error, not_started};
         {'DOWN', Mon, process, _Pid, Reason} ->
             error({category_process, Reason})
@@ -458,9 +482,8 @@ loop(Parent, Debug, State) ->
             receive
                 Msg ->
                     handle_msg(Msg, Parent, Debug, State)
-            after
-                ?HIBERNATION_TIMEOUT ->
-                    hibernate(Parent, Debug, State)
+            after ?HIBERNATION_TIMEOUT ->
+                hibernate(Parent, Debug, State)
             end;
         {drop, Work} ->
             UpdatedState = drop_work(Work, State),
@@ -469,10 +492,9 @@ loop(Parent, Debug, State) ->
             receive
                 Msg ->
                     handle_msg(Msg, Parent, Debug, State)
-            after
-                WaitTime ->
-                    UpdatedState = drop_work(Work, State),
-                    loop(Parent, Debug, UpdatedState)
+            after WaitTime ->
+                UpdatedState = drop_work(Work, State),
+                loop(Parent, Debug, UpdatedState)
             end
     end.
 
@@ -481,11 +503,13 @@ loop_action(State) ->
     Settings = State#state.settings,
     loop_action(WorkPeek, Settings, State).
 
-loop_action({value, Work}, Settings, State)
-  when Settings#settings.max_window_size < State#state.window_size ->
+loop_action({value, Work}, Settings, State) when
+    Settings#settings.max_window_size < State#state.window_size
+->
     {drop, Work};
-loop_action({value, Work}, Settings, _State)
-  when Settings#settings.max_window_duration =/= infinity ->
+loop_action({value, Work}, Settings, _State) when
+    Settings#settings.max_window_duration =/= infinity
+->
     Now = erlang:monotonic_time(milli_seconds),
     ExpirationTs = Work#work.timestamp + Settings#settings.max_window_duration,
     WaitTime = ExpirationTs - Now,
@@ -504,9 +528,9 @@ drop_work(Work, State) ->
     update_work_share(State#state.work_shares_table, Work#work.actor_id, -Work#work.weight),
     UpdatedState =
         State#state{
-          window = UpdatedWindow,
-          window_size = UpdatedWindowSize
-         },
+            window = UpdatedWindow,
+            window_size = UpdatedWindowSize
+        },
     set_work_stats_status(outdated, UpdatedState).
 
 handle_msg({system, From, Request}, Parent, Debug, State) ->
@@ -530,22 +554,22 @@ handle_nonsystem_msg({cast, reload_settings}, Parent, Debug, State) ->
     UpdatedState = handle_settings_reload(State),
     loop(Parent, Debug, UpdatedState);
 handle_nonsystem_msg({cast, {report_work_stats, WorkStats}}, Parent, Debug, State) ->
-    State2 = State#state{ work_stats = WorkStats },
+    State2 = State#state{work_stats = WorkStats},
     State3 = set_work_stats_status(updated, State2),
     loop(Parent, Debug, State3);
 handle_nonsystem_msg({replenish_coll_limiter_capacity, LastReplenishTs}, Parent, Debug, State) ->
     Settings = State#state.settings,
     CollLimiter = State#state.coll_limiter,
     UpdatedCollLimiter = replenish_coll_limiter_capacity(LastReplenishTs, Settings, CollLimiter),
-    UpdatedState = State#state{ coll_limiter = UpdatedCollLimiter },
+    UpdatedState = State#state{coll_limiter = UpdatedCollLimiter},
     loop(Parent, Debug, UpdatedState);
 handle_nonsystem_msg(Msg, _Parent, _Debug, _State) ->
     error({unexpected_msg, Msg}).
 
 handle_settings_reload(State) ->
     State#state{
-      settings = load_settings(State#state.category)
-     }.
+        settings = load_settings(State#state.category)
+    }.
 
 hibernate(Parent, Debug, State) ->
     proc_lib:hibernate(?MODULE, system_continue, [Parent, Debug, State]).
@@ -558,28 +582,31 @@ hibernate(Parent, Debug, State) ->
 parse_ask_opts(Opts) ->
     parse_ask_opts(Opts, #{}).
 
-parse_ask_opts([{weight, Weight} | Next], Acc)
-  when ?is_pos_integer(Weight) ->
+parse_ask_opts([{weight, Weight} | Next], Acc) when
+    ?is_pos_integer(Weight)
+->
     parse_ask_opts(
-      Next, Acc#{ weight => Weight }
-     );
+        Next, Acc#{weight => Weight}
+    );
 parse_ask_opts([return_stats | Next], Acc) ->
     parse_ask_opts(
-      Next, Acc#{ return_stats => true }
-     );
-parse_ask_opts([{min_actor_count, MinActorCount} | Next], Acc)
-  when ?is_pos_integer(MinActorCount) ->
+        Next, Acc#{return_stats => true}
+    );
+parse_ask_opts([{min_actor_count, MinActorCount} | Next], Acc) when
+    ?is_pos_integer(MinActorCount)
+->
     parse_ask_opts(
-      Next, Acc#{ min_actor_count => MinActorCount }
-     );
-parse_ask_opts([{iqr_factor, IqrFactor} | Next], Acc)
-  when ?is_non_neg_number(IqrFactor) ->
+        Next, Acc#{min_actor_count => MinActorCount}
+    );
+parse_ask_opts([{iqr_factor, IqrFactor} | Next], Acc) when
+    ?is_non_neg_number(IqrFactor)
+->
     parse_ask_opts(
-      Next, Acc#{ iqr_factor => IqrFactor }
-     );
+        Next, Acc#{iqr_factor => IqrFactor}
+    );
 parse_ask_opts([], Acc) ->
     Acc;
-parse_ask_opts([InvalidOpt|_], _Acc) ->
+parse_ask_opts([InvalidOpt | _], _Acc) ->
     error({badarg, InvalidOpt});
 parse_ask_opts(InvalidOpts, _Acc) ->
     error({badarg, InvalidOpts}).
@@ -589,8 +616,9 @@ handle_ask(ActorId, AskParams, State) ->
     Weight = maps:get(weight, AskParams, ?DEFAULT_WORK_WEIGHT),
     CollLimiter = State#state.coll_limiter,
 
-    case has_reached_work_limit(ActorId, AskParams, State) orelse
-         check_collective_limit(Weight, CollLimiter)
+    case
+        has_reached_work_limit(ActorId, AskParams, State) orelse
+            check_collective_limit(Weight, CollLimiter)
     of
         true ->
             maybe_return_stats_in_ask(AskParams, {rejected, outlier}, State);
@@ -603,7 +631,7 @@ handle_ask(ActorId, AskParams, State) ->
             maybe_return_stats_in_ask(AskParams, accepted, State4)
     end.
 
-maybe_return_stats_in_ask(#{ return_stats := true }, Status, State) ->
+maybe_return_stats_in_ask(#{return_stats := true}, Status, State) ->
     {{Status, State#state.work_stats}, State};
 maybe_return_stats_in_ask(_AskParams, Status, State) ->
     {Status, State}.
@@ -612,7 +640,7 @@ has_reached_work_limit(ActorId, AskParams, State) ->
     Settings = State#state.settings,
     MinActorCount = maps:get(min_actor_count, AskParams, Settings#settings.min_actor_count),
     case State#state.work_stats of
-        #{ actor_count := ActorCount, q3 := Q3, iqr := IQR } when ActorCount >= MinActorCount ->
+        #{actor_count := ActorCount, q3 := Q3, iqr := IQR} when ActorCount >= MinActorCount ->
             CurrentWorkShare = current_work_share(ActorId, State),
             IqrFactor = iqr_factor(AskParams, State),
             CurrentWorkShare > (Q3 + (IQR * IqrFactor));
@@ -634,43 +662,44 @@ iqr_factor(AskParams, State) ->
     Settings = State#state.settings,
     maps:get(iqr_factor, AskParams, Settings#settings.iqr_factor).
 
-accept(ActorId, Weight, Timestamp, State)
-  when State#state.window_size >= (State#state.settings)#settings.max_window_size ->
+accept(ActorId, Weight, Timestamp, State) when
+    State#state.window_size >= (State#state.settings)#settings.max_window_size
+->
     {value, Work} = queue:peek(State#state.window),
     UpdatedState = drop_work(Work, State),
     accept(ActorId, Weight, Timestamp, UpdatedState);
 accept(ActorId, Weight, Timestamp, State) ->
     Work =
         #work{
-           actor_id = ActorId,
-           weight = Weight,
-           timestamp = Timestamp
-          },
+            actor_id = ActorId,
+            weight = Weight,
+            timestamp = Timestamp
+        },
 
     UpdatedWindow = queue:in(Work, State#state.window),
     UpdatedWindowSize = State#state.window_size + 1,
     update_work_share(State#state.work_shares_table, ActorId, Weight),
     UpdatedState =
         State#state{
-          window = UpdatedWindow,
-          window_size = UpdatedWindowSize
-         },
+            window = UpdatedWindow,
+            window_size = UpdatedWindowSize
+        },
     set_work_stats_status(outdated, UpdatedState).
 
 update_work_share(Table, ActorId, ShareIncr) ->
-    (ets:update_counter(Table, ActorId, {2,ShareIncr}, {ActorId,0}) =:= 0
-     andalso ets:delete(Table, ActorId)).
+    (ets:update_counter(Table, ActorId, {2, ShareIncr}, {ActorId, 0}) =:= 0 andalso
+        ets:delete(Table, ActorId)).
 
 set_work_stats_status(Status, State) ->
     case {State#state.work_stats_status, Status} of
         {Same, Same} ->
             State;
         {updated, outdated} ->
-            State#state{ work_stats_status = outdated };
+            State#state{work_stats_status = outdated};
         {outdated, updating} ->
-            State#state{ work_stats_status = updating };
+            State#state{work_stats_status = updating};
         {updating, updated} ->
-            State#state{ work_stats_status = updated };
+            State#state{work_stats_status = updated};
         {updating, outdated} ->
             State
     end.
@@ -686,12 +715,12 @@ initial_coll_limiter(Settings) ->
             MaxCollectiveRate -> (MaxCollectiveRate * ?COLL_LIMITER_UPDATE_PERIOD) div 1000
         end,
     #coll_limiter{
-       capacity = Capacity,
-       accepted = 0,
-       rejected = 0,
-       desire_history = 0,
-       desire_history_size = 0
-      }.
+        capacity = Capacity,
+        accepted = 0,
+        rejected = 0,
+        desire_history = 0,
+        desire_history_size = 0
+    }.
 
 replenish_coll_limiter_capacity(LastReplenishTs, Settings, CollLimiter) ->
     Now = erlang:monotonic_time(),
@@ -705,12 +734,14 @@ replenish_coll_limiter_capacity(LastReplenishTs, Settings, CollLimiter) ->
                 TimeElapsed = Now - LastReplenishTs,
                 DelayCompensationRatio =
                     (TimeElapsed /
-                     erlang:convert_time_unit(?COLL_LIMITER_UPDATE_PERIOD, milli_seconds, native)
-                    ),
+                        erlang:convert_time_unit(
+                            ?COLL_LIMITER_UPDATE_PERIOD, milli_seconds, native
+                        )),
+
                 trunc(BaseRatio * DelayCompensationRatio * Settings#settings.max_collective_rate)
         end,
     schedule_coll_limiter_capacity_replenishment(?COLL_LIMITER_UPDATE_PERIOD, Now),
-    CollLimiter2 = CollLimiter#coll_limiter{ capacity = UpdatedCapacity },
+    CollLimiter2 = CollLimiter#coll_limiter{capacity = UpdatedCapacity},
     CollLimiter3 = update_coll_limiter_desire_history(CollLimiter2),
     clear_coll_limiter_counters(CollLimiter3).
 
@@ -729,25 +760,30 @@ update_coll_limiter_desire_history(CollLimiter) ->
             true ->
                 Desired;
             _ ->
-                WeightedPrev = (DesireHistory * (UpdatedDesireHistorySize - 1)) div UpdatedDesireHistorySize,
+                WeightedPrev =
+                    (DesireHistory * (UpdatedDesireHistorySize - 1)) div UpdatedDesireHistorySize,
                 WeightedNew = Desired div UpdatedDesireHistorySize,
                 WeightedPrev + WeightedNew
         end,
-    CollLimiter#coll_limiter{ desire_history = UpdatedDesireHistory,
-                              desire_history_size = UpdatedDesireHistorySize
-                            }.
+    CollLimiter#coll_limiter{
+        desire_history = UpdatedDesireHistory,
+        desire_history_size = UpdatedDesireHistorySize
+    }.
 
 clear_coll_limiter_counters(CollLimiter) ->
-    CollLimiter#coll_limiter{ accepted = 0, rejected = 0 }.
+    CollLimiter#coll_limiter{accepted = 0, rejected = 0}.
 
-check_collective_limit(_Weight, CollLimiter)
-  when CollLimiter#coll_limiter.capacity =:= infinity ->
+check_collective_limit(_Weight, CollLimiter) when
+    CollLimiter#coll_limiter.capacity =:= infinity
+->
     yes;
-check_collective_limit(Weight, CollLimiter)
-  when CollLimiter#coll_limiter.accepted + Weight > CollLimiter#coll_limiter.capacity ->
+check_collective_limit(Weight, CollLimiter) when
+    CollLimiter#coll_limiter.accepted + Weight > CollLimiter#coll_limiter.capacity
+->
     no;
-check_collective_limit(_Weight, CollLimiter)
-  when CollLimiter#coll_limiter.desire_history =< CollLimiter#coll_limiter.capacity ->
+check_collective_limit(_Weight, CollLimiter) when
+    CollLimiter#coll_limiter.desire_history =< CollLimiter#coll_limiter.capacity
+->
     yes;
 check_collective_limit(_Weight, CollLimiter) ->
     DieThrow = abs(erlang:monotonic_time()) rem CollLimiter#coll_limiter.desire_history,
@@ -759,12 +795,12 @@ check_collective_limit(_Weight, CollLimiter) ->
 update_coll_limiter_acceptances(Weight, State) ->
     CollLimiter = State#state.coll_limiter,
     UpdatedCollLimiter = increment_tuple_field(#coll_limiter.accepted, CollLimiter, +Weight),
-    State#state{ coll_limiter = UpdatedCollLimiter }.
+    State#state{coll_limiter = UpdatedCollLimiter}.
 
 update_coll_limiter_rejections(Weight, State) ->
     CollLimiter = State#state.coll_limiter,
     UpdatedCollLimiter = increment_tuple_field(#coll_limiter.rejected, CollLimiter, +Weight),
-    State#state{ coll_limiter = UpdatedCollLimiter }.
+    State#state{coll_limiter = UpdatedCollLimiter}.
 
 increment_tuple_field(Index, Tuple, Incr) ->
     Value = element(Index, Tuple),

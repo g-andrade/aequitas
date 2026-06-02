@@ -27,20 +27,20 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [start_link/0
-   ]).
+    [start_link/0]
+).
 
 -ignore_xref(
-   [start_link/0
-   ]).
+    [start_link/0]
+).
 
 %% ------------------------------------------------------------------
 %% supervisor Function Exports
 %% ------------------------------------------------------------------
 
 -export(
-   [init/1
-   ]).
+    [init/1]
+).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -60,30 +60,37 @@ start_link() ->
 %% supervisor Function Definitions
 %% ------------------------------------------------------------------
 
--spec init([]) -> {ok, {supervisor:sup_flags(),
-                        [supervisor:child_spec(), ...]}}.
+-spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec(), ...]}}.
 init([]) ->
     SupFlags =
-        #{ strategy => rest_for_one,
-           intensity => 10,
-           period => 1
-         },
+        #{
+            strategy => rest_for_one,
+            intensity => 10,
+            period => 1
+        },
     ChildSpecs =
-        [#{ id => proc_reg,
-            start => {aequitas_proc_reg, start_link, []}
-          },
-         #{ id => cfg,
-            start => {aequitas_cfg, start_link, []}
-          },
-         #{ id => work_stats_sup,
-            start => {aequitas_work_stats_sup, start_link, []},
-            type => supervisor
-          },
-         #{ id => category_sup,
-            start => {aequitas_category_sup, start_link, []},
-            type => supervisor
-          },
-         #{ id => boot_categories,
-            start => {aequitas_boot_categories, start_link, []}
-          }],
+        [
+            #{
+                id => proc_reg,
+                start => {aequitas_proc_reg, start_link, []}
+            },
+            #{
+                id => cfg,
+                start => {aequitas_cfg, start_link, []}
+            },
+            #{
+                id => work_stats_sup,
+                start => {aequitas_work_stats_sup, start_link, []},
+                type => supervisor
+            },
+            #{
+                id => category_sup,
+                start => {aequitas_category_sup, start_link, []},
+                type => supervisor
+            },
+            #{
+                id => boot_categories,
+                start => {aequitas_boot_categories, start_link, []}
+            }
+        ],
     {ok, {SupFlags, ChildSpecs}}.

@@ -36,26 +36,30 @@ configuration and examples.
 %%-------------------------------------------------------------------
 
 -export(
-   [start/1,
-    start/2,
-    stop/1,
-    ask/2,
-    ask/3,
-    async_ask/2,
-    async_ask/3,
-    reconfigure/2
-   ]).
+    [
+        start/1,
+        start/2,
+        stop/1,
+        ask/2,
+        ask/3,
+        async_ask/2,
+        async_ask/3,
+        reconfigure/2
+    ]
+).
 
 -ignore_xref(
-   [start/1,
-    start/2,
-    stop/1,
-    ask/2,
-    ask/3,
-    async_ask/2,
-    async_ask/3,
-    reconfigure/2
-   ]).
+    [
+        start/1,
+        start/2,
+        stop/1,
+        ask/2,
+        ask/3,
+        async_ask/2,
+        async_ask/3,
+        reconfigure/2
+    ]
+).
 
 %%-------------------------------------------------------------------
 %% API Function Definitions
@@ -68,9 +72,9 @@ Like `start/2` but with default options.
 See also `stop/1` and `reconfigure/2`.
 """.
 -endif.
--spec start(Category) -> ok | {error, Reason}
-    when Category :: term(),
-         Reason :: already_started.
+-spec start(Category) -> ok | {error, Reason} when
+    Category :: term(),
+    Reason :: already_started.
 start(Category) ->
     start(Category, []).
 
@@ -89,12 +93,13 @@ Returns:
 See also `start/1`, `stop/1` and `reconfigure/2`.
 """.
 -endif.
--spec start(Category, Opts) -> ok | {error, Reason}
-    when Category :: term(),
-         Opts :: [aequitas_category:setting_opt()],
-         Reason :: (already_started |
-                    {invalid_setting_opt, term()} |
-                    {invalid_setting_opts, term()}).
+-spec start(Category, Opts) -> ok | {error, Reason} when
+    Category :: term(),
+    Opts :: [aequitas_category:setting_opt()],
+    Reason ::
+        (already_started
+        | {invalid_setting_opt, term()}
+        | {invalid_setting_opts, term()}).
 start(Category, Opts) ->
     case aequitas_category:start(Category, true, Opts) of
         {ok, _Pid} ->
@@ -119,9 +124,9 @@ Returns:
 See also `start/1` and `reconfigure/2`.
 """.
 -endif.
--spec stop(Category) -> ok | {error, Reason}
-    when Category :: term(),
-         Reason :: not_started.
+-spec stop(Category) -> ok | {error, Reason} when
+    Category :: term(),
+    Reason :: not_started.
 stop(Category) ->
     aequitas_category:stop(Category).
 
@@ -132,12 +137,12 @@ Like `ask/3` but with default options.
 See also `async_ask/2` and `async_ask/3`.
 """.
 -endif.
--spec ask(Category, ActorId) -> Status | {error, Reason}
-    when Category :: term(),
-         ActorId :: term(),
-         Status :: accepted | {rejected, RejectionReason},
-         RejectionReason :: outlier | rate_limited,
-         Reason :: not_started.
+-spec ask(Category, ActorId) -> Status | {error, Reason} when
+    Category :: term(),
+    ActorId :: term(),
+    Status :: accepted | {rejected, RejectionReason},
+    RejectionReason :: outlier | rate_limited,
+    Reason :: not_started.
 ask(Category, ActorId) ->
     ask(Category, ActorId, []).
 
@@ -158,15 +163,18 @@ Returns:
 See also `ask/2`, `async_ask/2` and `async_ask/3`.
 """.
 -endif.
--spec ask(Category, ActorId, Opts) -> Status | {Status, Stats} |
-                                      {error, Reason}
-    when Category :: term(),
-         ActorId :: term(),
-         Opts :: [aequitas_category:ask_opt()],
-         Status :: accepted | {rejected, RejectionReason},
-         RejectionReason :: outlier | rate_limited,
-         Stats :: aequitas_work_stats:t(),
-         Reason :: not_started.
+-spec ask(Category, ActorId, Opts) ->
+    Status
+    | {Status, Stats}
+    | {error, Reason}
+when
+    Category :: term(),
+    ActorId :: term(),
+    Opts :: [aequitas_category:ask_opt()],
+    Status :: accepted | {rejected, RejectionReason},
+    RejectionReason :: outlier | rate_limited,
+    Stats :: aequitas_work_stats:t(),
+    Reason :: not_started.
 ask(Category, ActorId, Opts) ->
     aequitas_category:ask(Category, ActorId, Opts).
 
@@ -177,11 +185,11 @@ Like `async_ask/3` but with default options.
 See also `ask/2` and `ask/3`.
 """.
 -endif.
--spec async_ask(Category, ActorId) -> {Tag, Monitor}
-    when Category :: term(),
-         ActorId :: term(),
-         Tag :: reference(),
-         Monitor :: reference().
+-spec async_ask(Category, ActorId) -> {Tag, Monitor} when
+    Category :: term(),
+    ActorId :: term(),
+    Tag :: reference(),
+    Monitor :: reference().
 async_ask(Category, ActorId) ->
     async_ask(Category, ActorId, []).
 
@@ -205,12 +213,12 @@ can be done like this: `demonitor(Monitor, [flush])`.
 See also `ask/2`, `ask/3` and `async_ask/2`.
 """.
 -endif.
--spec async_ask(Category, ActorId, Opts) -> {Tag, Monitor}
-    when Category :: term(),
-         ActorId :: term(),
-         Opts :: [aequitas_category:ask_opt()],
-         Tag :: reference(),
-         Monitor :: reference().
+-spec async_ask(Category, ActorId, Opts) -> {Tag, Monitor} when
+    Category :: term(),
+    ActorId :: term(),
+    Opts :: [aequitas_category:ask_opt()],
+    Tag :: reference(),
+    Monitor :: reference().
 async_ask(Category, ActorId, Opts) ->
     aequitas_category:async_ask(Category, ActorId, Opts).
 
@@ -229,10 +237,11 @@ Returns:
 See also `start/2` and `stop/1`.
 """.
 -endif.
--spec reconfigure(Category, SettingOpts)
-        -> ok | {error, Reason}
-    when Category :: term(),
-         SettingOpts :: [aequitas_category:setting_opt()],
-         Reason :: not_started | {invalid_setting_opt | invalid_setting_opts, term()}.
+-spec reconfigure(Category, SettingOpts) ->
+    ok | {error, Reason}
+when
+    Category :: term(),
+    SettingOpts :: [aequitas_category:setting_opt()],
+    Reason :: not_started | {invalid_setting_opt | invalid_setting_opts, term()}.
 reconfigure(Category, SettingOpts) ->
     aequitas_category:update_settings(Category, SettingOpts).

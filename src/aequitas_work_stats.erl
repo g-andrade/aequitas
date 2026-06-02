@@ -38,54 +38,61 @@ when the `return_stats` option is given to `aequitas:ask/3`.
 %%-------------------------------------------------------------------
 
 -export(
-   [start_link/2,
-    start/2,
-    generate_work_stats/1
-   ]).
+    [
+        start_link/2,
+        start/2,
+        generate_work_stats/1
+    ]
+).
 
 -ignore_xref(
-   [start_link/2
-   ]).
+    [start_link/2]
+).
 
 %%-------------------------------------------------------------------
 %% OTP Function Exports
 %%-------------------------------------------------------------------
 
 -export(
-   [init/1,
-    system_code_change/4,
-    system_continue/3,
-    system_terminate/4,
-    write_debug/3
-   ]).
+    [
+        init/1,
+        system_code_change/4,
+        system_continue/3,
+        system_terminate/4,
+        write_debug/3
+    ]
+).
 
 -ignore_xref(
-   [init/1,
-    system_code_change/4,
-    system_continue/3,
-    system_terminate/4,
-    write_debug/3
-   ]).
+    [
+        init/1,
+        system_code_change/4,
+        system_continue/3,
+        system_terminate/4,
+        write_debug/3
+    ]
+).
 
 %%-------------------------------------------------------------------
 %% Record and Type Definitions
 %%-------------------------------------------------------------------
 
 -record(state, {
-          category_pid :: pid(),
-          category_mon :: reference(),
-          work_shares_table :: ets:tab()
-         }).
+    category_pid :: pid(),
+    category_mon :: reference(),
+    work_shares_table :: ets:tab()
+}).
 -type state() :: #state{}.
 
 -type t() ::
-        #{ actor_count => non_neg_integer(),
-           q1 => number(),
-           q2 => number(),
-           q3 => number(),
-           iqr => number(),
-           seconds_to_generate => number()
-         }.
+    #{
+        actor_count => non_neg_integer(),
+        q1 => number(),
+        q2 => number(),
+        q3 => number(),
+        iqr => number(),
+        seconds_to_generate => number()
+    }.
 -export_type([t/0]).
 
 %%-------------------------------------------------------------------
@@ -119,10 +126,10 @@ init({Parent, [CategoryPid, WorkSharesTable]}) ->
     Debug = sys:debug_options([]),
     State =
         #state{
-           category_pid = CategoryPid,
-           category_mon = monitor(process, CategoryPid),
-           work_shares_table = WorkSharesTable
-          },
+            category_pid = CategoryPid,
+            category_mon = monitor(process, CategoryPid),
+            work_shares_table = WorkSharesTable
+        },
     loop(Parent, Debug, State).
 
 -spec write_debug(io:device(), term(), term()) -> ok.
@@ -161,23 +168,24 @@ loop(Parent, Debug, State) ->
             UpdatedDebug = sys:handle_debug(Debug, fun ?MODULE:write_debug/3, ?MODULE, {in, Msg}),
             UpdatedState = handle_nonsystem_msg(Msg, State),
             loop(Parent, UpdatedDebug, UpdatedState)
-    after
-        5000 ->
-            hibernate(Parent, Debug, State)
+    after 5000 ->
+        hibernate(Parent, Debug, State)
     end.
 
 handle_nonsystem_msg(generate_work_stats, State) ->
     MatchSpec =
         ets:fun2ms(
-          fun ({_ActorId, Share}) when Share > 0 ->
-                  Share
-          end),
+            fun({_ActorId, Share}) when Share > 0 ->
+                Share
+            end
+        ),
     Samples = ets:select(State#state.work_shares_table, MatchSpec),
     WorkStats = crunch_work_stats(Samples),
     aequitas_category:report_work_stats(State#state.category_pid, WorkStats),
     State;
-handle_nonsystem_msg({'DOWN', Ref, process, _Pid, _Reason}, State)
-  when Ref =:= State#state.category_mon ->
+handle_nonsystem_msg({'DOWN', Ref, process, _Pid, _Reason}, State) when
+    Ref =:= State#state.category_mon
+->
     exit(normal);
 handle_nonsystem_msg(Msg, _State) ->
     error({unexpected_msg, Msg}).
@@ -196,22 +204,24 @@ crunch_work_stats(Samples) ->
         true ->
             % not enough samples
             EndTs = erlang:monotonic_time(nano_seconds),
-            #{ actor_count => ActorCount ,
-               seconds_to_generate => (EndTs - StartTs) / 1.0e9
-             };
+            #{
+                actor_count => ActorCount,
+                seconds_to_generate => (EndTs - StartTs) / 1.0e9
+            };
         false ->
             SortedSamples = lists:sort(Samples),
             {Q2, LowerHalf, UpperHalf} = median_split(SortedSamples),
             {Q1, _, _} = median_split(LowerHalf),
             {Q3, _, _} = median_split(UpperHalf),
             EndTs = erlang:monotonic_time(nano_seconds),
-            #{ actor_count => ActorCount,
-               q1 => Q1,
-               q2 => Q2,
-               q3 => Q3,
-               iqr => Q3 - Q1,
-               seconds_to_generate => (EndTs - StartTs) / 1.0e9
-             }
+            #{
+                actor_count => ActorCount,
+                q1 => Q1,
+                q2 => Q2,
+                q3 => Q3,
+                iqr => Q3 - Q1,
+                seconds_to_generate => (EndTs - StartTs) / 1.0e9
+            }
     end.
 
 median_split([Median]) ->

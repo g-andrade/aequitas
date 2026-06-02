@@ -43,12 +43,12 @@ Defines the `t:t/0` time-interval type (e.g. `{seconds, 5}`) accepted by
 -export_type([t/0]).
 
 -type unit() ::
-    milliseconds |
-    seconds |
-    minutes |
-    hours |
-    days |
-    weeks.
+    milliseconds
+    | seconds
+    | minutes
+    | hours
+    | days
+    | weeks.
 -export_type([unit/0]).
 
 %%-------------------------------------------------------------------

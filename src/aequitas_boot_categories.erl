@@ -27,25 +27,27 @@
 %% ------------------------------------------------------------------
 
 -export(
-   [start_link/0
-   ]).
+    [start_link/0]
+).
 
 -ignore_xref(
-   [start_link/0
-   ]).
+    [start_link/0]
+).
 
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
 
 -export(
-   [init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3
-   ]).
+    [
+        init/1,
+        handle_call/3,
+        handle_cast/2,
+        handle_info/2,
+        terminate/2,
+        code_change/3
+    ]
+).
 
 %% ------------------------------------------------------------------
 %% Macro Definitions
@@ -82,8 +84,8 @@ init([]) ->
             {stop, {Class, Reason}}
     end.
 
--spec handle_call(term(), {pid(), reference()}, state())
-        -> {stop, unexpected_call, state()}.
+-spec handle_call(term(), {pid(), reference()}, state()) ->
+    {stop, unexpected_call, state()}.
 handle_call(_Call, _From, State) ->
     {stop, unexpected_call, State}.
 
@@ -111,25 +113,29 @@ code_change(_OldVsn, State, _Extra) ->
 launch_foreknown_categories() ->
     AppConfig = application:get_all_env(aequitas),
     lists:foreach(
-      fun ({categories, SettingOptsPerCategory}) ->
-              launch_foreknown_categories(SettingOptsPerCategory);
-          ({{category, Category}, _SettingOpts}) ->
-              % legacy format which is not compatible with releases
-              % (nor does it respect the documented sys.config
-              %  constraints - all keys must be atoms)
-              error({release_incompatible_static_configuration, Category});
-          ({_Key, _Value}) ->
-              ok
-      end,
-      AppConfig).
+        fun
+            ({categories, SettingOptsPerCategory}) ->
+                launch_foreknown_categories(SettingOptsPerCategory);
+            ({{category, Category}, _SettingOpts}) ->
+                % legacy format which is not compatible with releases
+                % (nor does it respect the documented sys.config
+                %  constraints - all keys must be atoms)
+                error({release_incompatible_static_configuration, Category});
+            ({_Key, _Value}) ->
+                ok
+        end,
+        AppConfig
+    ).
 
--spec launch_foreknown_categories(#{ term() => [aequitas_category:setting_opt()] }) -> ok | no_return().
+-spec launch_foreknown_categories(#{term() => [aequitas_category:setting_opt()]}) ->
+    ok | no_return().
 launch_foreknown_categories(SettingOptsPerCategory) when is_map(SettingOptsPerCategory) ->
     lists:foreach(
-      fun ({Category, SettingOpts}) ->
-              launch_foreknown_category(Category, SettingOpts)
-      end,
-      maps:to_list(SettingOptsPerCategory)).
+        fun({Category, SettingOpts}) ->
+            launch_foreknown_category(Category, SettingOpts)
+        end,
+        maps:to_list(SettingOptsPerCategory)
+    ).
 
 -spec launch_foreknown_category(term(), [aequitas_category:setting_opt()]) -> ok | no_return().
 launch_foreknown_category(Category, SettingOpts) ->
@@ -137,6 +143,8 @@ launch_foreknown_category(Category, SettingOpts) ->
         {ok, _Pid} ->
             ok;
         {error, Reason} ->
-            error(#{ category => Category,
-                     reason => Reason })
+            error(#{
+                category => Category,
+                reason => Reason
+            })
     end.
