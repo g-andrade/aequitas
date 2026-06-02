@@ -1,25 +1,81 @@
 ---
-name: build
+name: CI
 on:
   push:
     branches:
-      - master
+      - main
+      - develop
   pull_request:
     branches:
-      - master
+      - main
+      - develop
+  workflow_dispatch:
 jobs:
   ci:
-    name: >
-      Run checks and tests over ${{matrix.otp_vsn}} and ${{matrix.os}}
+    name: Run checks and tests over ${{matrix.otp_vsn}} and ${{matrix.os}}
     runs-on: ${{matrix.os}}
-    container:
-      image: erlang:${{matrix.otp_vsn}}
     strategy:
       matrix:
-        otp_vsn: ['22.0', '22.1', '22.2', '22.3',
-                  '23.0', '23.1', '23.2', '23.3',
-                  '24.0', '24.1', '24.2', '24.3']
-        os: [ubuntu-latest]
+        otp_vsn: [
+            '24.3',
+            '25.3',
+            '26.2',
+            '27.3',
+            '28.5',
+            '29.0'
+        ]
+        os: ['ubuntu-22.04']
     steps:
-      - uses: actions/checkout@v2
-      - run: RUNNING_ON_CI=yes make check ci_test
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - id: otp-version-to-rebar3-version
+        name: "Read #{OTP version => rebar3 version} map"
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: ./.github/workflows/otp_version_to_rebar3_version.json
+
+      - id: setup-beam
+        name: Setup BEAM
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{matrix.otp_vsn}}
+          # rebar3-version: https://stackoverflow.com/a/64405821
+          rebar3-version: |
+            ${{ fromJson(steps.otp-version-to-rebar3-version.outputs.content)[matrix.otp_vsn] }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Set dynamic env (1)
+        run: |
+          echo "prev_github_run_number=$((${{github.run_number}} - 1))" >> "$GITHUB_ENV"
+          echo "build_cache_prefix=_build-cache3-for-os-${{runner.os}}-otp-${{matrix.otp_vsn}}-rebar3-${{steps.setup-beam.outputs.rebar3-version}}" >> "$GITHUB_ENV"
+
+      - name: Set dynamic env (2)
+        run: |
+          echo "build_cache_prefix_with_hash=${{env.build_cache_prefix}}-hash-${{hashFiles('rebar.lock')}}" >> "$GITHUB_ENV"
+
+      - name: Restore cached build artifacts
+        uses: actions/cache/restore@v5
+        with:
+          path: _build
+          key: ${{env.build_cache_prefix_with_hash}}-${{env.prev_github_run_number}}
+          restore-keys: |-
+            ${{env.build_cache_prefix_with_hash}}-
+            ${{env.build_cache_prefix}}-
+
+      - name: Run Fast Checks
+        run: make check-fast
+
+      - name: Run Tests
+        run: make test
+
+      - name: Run Slow Checks
+        run: make check-slow
+
+      - name: Save build artifacts to cache
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: _build
+          key: ${{env.build_cache_prefix_with_hash}}-${{github.run_number}}
