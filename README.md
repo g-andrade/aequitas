@@ -1,10 +1,8 @@
 # aequitas
 
-**This library is not under active maintenance; if you'd like to perform
-maintenance yourself, feel free to open an issue requesting access.**
-
 [![](https://img.shields.io/hexpm/v/aequitas.svg?style=flat)](https://hex.pm/packages/aequitas)
-[![](https://github.com/g-andrade/aequitas/workflows/build/badge.svg)](https://github.com/g-andrade/aequitas/actions?query=workflow%3Abuild)
+[![](https://github.com/g-andrade/aequitas/actions/workflows/ci.yml/badge.svg)](https://github.com/g-andrade/aequitas/actions/workflows/ci.yml)
+[![Erlang Versions](https://img.shields.io/badge/Supported%20Erlang%2FOTP-24%20to%2029-blue)](https://www.erlang.org)
 
 `aequitas` is a fairness regulator for Erlang/OTP and Elixir, with
 optional rate limiting capabilities.
@@ -59,7 +57,7 @@ Documentation and reference are hosted on
 
 #### Tested setup
 
-  - Erlang/OTP 22 or higher
+  - Erlang/OTP 24 or higher
   - rebar3
 
 #### Category Tweaking
