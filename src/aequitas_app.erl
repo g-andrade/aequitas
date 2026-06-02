@@ -18,8 +18,12 @@
 %% FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 %% DEALINGS IN THE SOFTWARE.
 
-%% @private
 -module(aequitas_app).
+
+-ifdef(E48).
+-moduledoc false.
+-endif.
+
 -behaviour(application).
 
 %%-------------------------------------------------------------------

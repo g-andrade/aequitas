@@ -194,18 +194,28 @@ to the library; the externally relevant surface is the
 
 -spec start_link(term(), boolean(), [setting_opt()]) ->
     {ok, pid()} | {error, {already_started, pid()}}.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 start_link(Category, SaveSettings, SettingOpts) ->
     Args = [{self(), [Category, SaveSettings, SettingOpts]}],
     Timeout = infinity,
     Opts = [],
     proc_lib:start_link(?MODULE, init, Args, Timeout, Opts).
 
+%%
+
 -spec start(term(), boolean(), [setting_opt()]) ->
     {ok, pid()}
     | {error, {invalid_setting_opt | invalid_setting_opts, _}}
     | {error, {already_started, pid()}}.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 start(Category, SaveSettings, SettingOpts) ->
     case validate_settings(SettingOpts) of
         ok ->
@@ -214,12 +224,20 @@ start(Category, SaveSettings, SettingOpts) ->
             {error, Reason}
     end.
 
+%%
+
 -spec stop(term()) -> ok | {error, not_started}.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 stop(Category) ->
     Pid = whereis_server(Category),
     {Tag, Mon} = send_call(Pid, stop),
     wait_call_reply(Tag, Mon).
+
+%%
 
 -spec ask(term(), term(), [ask_opt()]) ->
     Status | {Status, Stats} | {error, Reason}
@@ -228,21 +246,37 @@ when
     RejectionReason :: outlier | rate_limited,
     Stats :: aequitas_work_stats:t(),
     Reason :: not_started.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 ask(Category, ActorId, Opts) ->
     {Tag, Mon} = async_ask(Category, ActorId, Opts),
     wait_call_reply(Tag, Mon).
 
+%%
+
 -spec async_ask(term(), term(), [ask_opt()]) -> {reference(), reference()}.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 async_ask(Category, ActorId, Opts) ->
     Params = parse_ask_opts(Opts),
     Pid = whereis_server(Category),
     send_call(Pid, {ask, ActorId, Params}).
 
+%%
+
 -spec update_settings(term(), [setting_opt()]) ->
     ok | {error, not_started | {invalid_setting_opt | invalid_setting_opts, _}}.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 update_settings(Category, SettingOpts) ->
     case validate_settings(SettingOpts) of
         ok ->
@@ -252,15 +286,29 @@ update_settings(Category, SettingOpts) ->
             {error, Reason}
     end.
 
+%%
+
 -spec async_reload_settings(pid()) -> ok.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 async_reload_settings(Pid) ->
     send_cast(Pid, reload_settings).
 
+%%
+
 -spec report_work_stats(pid(), aequitas_work_stats:t()) -> ok.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 report_work_stats(Pid, WorkStats) ->
     send_cast(Pid, {report_work_stats, WorkStats}).
+
+%%
 
 -ifdef(TEST).
 get_current_setting(Category, max_window_size) ->
@@ -275,7 +323,11 @@ get_current_setting(Category, max_window_size) ->
 %%-------------------------------------------------------------------
 
 -spec init({pid(), [term(), ...]}) -> no_return().
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 init({Parent, [Category, SaveSettings, SettingOpts]}) ->
     Debug = sys:debug_options([]),
     Server = server_name(Category),
@@ -313,27 +365,51 @@ init({Parent, [Category, SaveSettings, SettingOpts]}) ->
             proc_lib:init_ack(Parent, {error, {already_started, ExistingPid}})
     end.
 
+%%
+
 -spec write_debug(io:device(), term(), term()) -> ok.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 write_debug(Dev, Event, Name) ->
     % called by sys:handle_debug().
     io:format(Dev, "~p event = ~p~n", [Name, Event]).
 
+%%
+
 -spec system_continue(pid(), [sys:dbg_opt()], state()) -> no_return().
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 system_continue(Parent, Debug, State) ->
     % http://www.erlang.org/doc/man/sys.html#Mod:system_continue-3
     loop(Parent, Debug, State).
 
+%%
+
 -spec system_terminate(term(), pid(), [sys:dbg_opt()], state()) -> no_return().
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 system_terminate(Reason, _Parent, _Debug, _State) ->
     % http://www.erlang.org/doc/man/sys.html#Mod:system_terminate-4
     exit(Reason).
 
+%%
+
 -spec system_code_change(state(), ?MODULE, term(), term()) -> {ok, state()}.
 %% http://www.erlang.org/doc/man/sys.html#Mod:system_code_change-4
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 system_code_change(State, _Module, _OldVsn, _Extra) ->
     {ok, State}.
 

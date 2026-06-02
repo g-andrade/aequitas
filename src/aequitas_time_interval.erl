@@ -56,7 +56,11 @@ Defines the `t:t/0` time-interval type (e.g. `{seconds, 5}`) accepted by
 %%-------------------------------------------------------------------
 
 -spec to_milliseconds(t()) -> {ok, non_neg_integer()} | error.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 to_milliseconds({milliseconds, HowMany}) ->
     to_milliseconds(HowMany, 1);
 to_milliseconds({seconds, HowMany}) ->

@@ -100,17 +100,33 @@ when the `return_stats` option is given to `aequitas:ask/3`.
 %%-------------------------------------------------------------------
 
 -spec start_link(pid(), ets:tab()) -> {ok, pid()}.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 start_link(CategoryPid, WorkSharesTable) ->
     proc_lib:start_link(?MODULE, init, [{self(), [CategoryPid, WorkSharesTable]}]).
 
+%%
+
 -spec start(pid(), ets:tab()) -> {ok, pid()}.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 start(CategoryPid, WorkSharesTable) ->
     aequitas_work_stats_sup:start_child([CategoryPid, WorkSharesTable]).
 
+%%
+
 -spec generate_work_stats(pid()) -> ok.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 generate_work_stats(WorkStatsPid) ->
     WorkStatsPid ! generate_work_stats,
     ok.
@@ -120,7 +136,11 @@ generate_work_stats(WorkStatsPid) ->
 %%-------------------------------------------------------------------
 
 -spec init({pid(), [pid(), ...]}) -> no_return().
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 init({Parent, [CategoryPid, WorkSharesTable]}) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     Debug = sys:debug_options([]),
@@ -132,26 +152,50 @@ init({Parent, [CategoryPid, WorkSharesTable]}) ->
         },
     loop(Parent, Debug, State).
 
+%%
+
 -spec write_debug(io:device(), term(), term()) -> ok.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 write_debug(Dev, Event, Name) ->
     % called by sys:handle_debug().
     io:format(Dev, "~p event = ~p~n", [Name, Event]).
 
+%%
+
 -spec system_continue(pid(), [sys:dbg_opt()], state()) -> no_return().
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 system_continue(Parent, Debug, State) ->
     % http://www.erlang.org/doc/man/sys.html#Mod:system_continue-3
     loop(Parent, Debug, State).
 
+%%
+
 -spec system_terminate(term(), pid(), [sys:dbg_opt()], state()) -> no_return().
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 system_terminate(Reason, _Parent, _Debug, _State) ->
     % http://www.erlang.org/doc/man/sys.html#Mod:system_terminate-4
     exit(Reason).
 
+%%
+
 -spec system_code_change(state(), ?MODULE, term(), term()) -> {ok, state()}.
-%% @private
+
+-ifdef(E48).
+-doc false.
+-endif.
+
 %% http://www.erlang.org/doc/man/sys.html#Mod:system_code_change-4
 system_code_change(State, _Module, _OldVsn, _Extra) ->
     {ok, State}.
