@@ -75,9 +75,12 @@ aequitas_sup            (rest_for_one)
   reformat commit is listed in `.git-blame-ignore-revs`.
 - Documentation is **EEP-48 native**: `-moduledoc`/`-doc` attributes, each
   guarded by `-ifdef(E48). ... -endif.` (the `E48` macro is defined only on
-  OTP 27+ via `rebar.config`). ex_doc renders these; legacy edoc `@private`
-  tags are kept and merged in by the edoc chunk doclet (`rebar3 edoc`, which
-  uses the top-level `edoc_opts`).
+  OTP 27+ via `rebar.config`). `make doc` runs `rebar3 edoc` (using the
+  top-level `edoc_opts` chunk doclet) and renders the chunks with ex_doc.
+  Private modules and internal functions are hidden with `-moduledoc false` /
+  `-doc false` — **not** legacy `%% @private` comments, which ex_doc does not
+  honor (a documented module lists every exported function unless it carries a
+  `-doc false`). There are no `@private` tags left in `src/`.
 - Lint exceptions live in `elvis.config` and are documented inline (lowercase
   `is_*` guard macros, internal `state/0` types, the monitor-guarded `receive`
   in `aequitas_category`, relaxed test rules). Hank ignores the
