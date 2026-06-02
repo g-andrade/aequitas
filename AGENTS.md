@@ -76,7 +76,8 @@ aequitas_sup            (rest_for_one)
 - Documentation is **EEP-48 native**: `-moduledoc`/`-doc` attributes, each
   guarded by `-ifdef(E48). ... -endif.` (the `E48` macro is defined only on
   OTP 27+ via `rebar.config`). ex_doc renders these; legacy edoc `@private`
-  tags are kept and merged in by the edoc chunk doclet (`rebar3 as docs edoc`).
+  tags are kept and merged in by the edoc chunk doclet (`rebar3 edoc`, which
+  uses the top-level `edoc_opts`).
 - Lint exceptions live in `elvis.config` and are documented inline (lowercase
   `is_*` guard macros, internal `state/0` types, the monitor-guarded `receive`
   in `aequitas_category`, relaxed test rules). Hank ignores the
