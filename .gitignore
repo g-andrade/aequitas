@@ -1,18 +1,15 @@
 .rebar3
-_*
-.eunit
-*.o
-*.beam
-*.plt
-*.swp
-*.swo
-.erlang.cookie
-ebin
-log
-erl_crash.dump
-.rebar
-logs
+
+# asdf
+.tool-versions
+
+# claude local settings
+/claude/settings.local.json
+
+# build/doc/run artifacts
 _build
-.idea
-*.iml
+doc/
+erl_crash.dump
+log
 rebar3.crashdump
+/tmp/

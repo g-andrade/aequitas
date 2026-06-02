@@ -1,13 +1,53 @@
 % vim: set ft=erlang:
-RunningOnCI = os:getenv("RUNNING_ON_CI"),
-try RunningOnCI =:= false andalso hipe:module_info() of
-    false ->
-        CONFIG;
-    [_|_] ->
-        {_, ErlOpts} = lists:keyfind(erl_opts, 1, CONFIG),
-        Tuple = {d,'HIPE_SUPPORTED'},
-        lists:keystore(erl_opts, 1, CONFIG, {erl_opts, [Tuple|ErlOpts]})
-catch
-    error:undef ->
-        CONFIG
+begin
+    TakeOutProjPlugin =
+        fun(Name, Config) ->
+            {project_plugins, ProjPlugins} =
+                lists:keyfind(project_plugins, 1, Config),
+            {value, {_, _Version}, RemainingProjPlugins} =
+                lists:keytake(Name, 1, ProjPlugins),
+            % logger:notice("Dropping proj plugin '~ts' ~ts", [Name, _Version]),
+            _UpdatedConfig =
+                lists:keystore(
+                    project_plugins, 1, Config, {project_plugins, RemainingProjPlugins}
+                )
+        end,
+
+    TakeOutElvis =
+        fun(Config) ->
+            TakeOutProjPlugin(rebar3_lint, Config)
+        end,
+
+    TakeOutErlFmt =
+        fun(Config) ->
+            TakeOutProjPlugin(erlfmt, Config)
+        end,
+
+    TakeOutHank =
+        fun(Config) ->
+            TakeOutProjPlugin(rebar3_hank, Config)
+        end,
+
+    OtpRelease = erlang:system_info(otp_release),
+    try list_to_integer(OtpRelease) of
+        IntRelease when IntRelease =< 25 ->
+            % Take dev helpers away as they're no longer compatible with OTP 25
+            TakeOutHank(TakeOutErlFmt(TakeOutElvis(CONFIG)));
+        %
+        29 ->
+            % Remove after the issues below are resolved and fixed versions of
+            % `katana_code` and `rebar3_hank` are published.
+            %
+            % * https://github.com/inaka/katana-code/issues/101
+            % * https://github.com/erlang/otp/issues/11155
+            %
+            TakeOutHank(CONFIG);
+        %
+        _ ->
+            CONFIG
+    catch
+        error:badarg ->
+            logger:warning("Don't know how to compare to OTP release: ~tp", [OtpRelease]),
+            CONFIG
+    end
 end.
