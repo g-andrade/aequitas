@@ -104,7 +104,6 @@ to the library; the externally relevant surface is the
 -define(DEFAULT_MAX_COLLECTIVE_RATE, infinity).
 
 -define(DEFAULT_WORK_WEIGHT, 1).
--define(DEFAULT_RETURN_STATS, false).
 
 % in milliseconds
 -define(COLL_LIMITER_UPDATE_PERIOD, 500).
@@ -264,14 +263,11 @@ report_work_stats(Pid, WorkStats) ->
     send_cast(Pid, {report_work_stats, WorkStats}).
 
 -ifdef(TEST).
-get_current_setting(Category, Key) ->
+get_current_setting(Category, max_window_size) ->
     Pid = whereis_server(Category),
     State = sys:get_state(Pid),
     Settings = State#state.settings,
-    case Key of
-        max_window_size ->
-            {ok, Settings#settings.max_window_size}
-    end.
+    {ok, Settings#settings.max_window_size}.
 -endif.
 
 %%-------------------------------------------------------------------
@@ -323,13 +319,13 @@ write_debug(Dev, Event, Name) ->
     % called by sys:handle_debug().
     io:format(Dev, "~p event = ~p~n", [Name, Event]).
 
--spec system_continue(pid(), [sys:debug_opt()], state()) -> no_return().
+-spec system_continue(pid(), [sys:dbg_opt()], state()) -> no_return().
 %% @private
 system_continue(Parent, Debug, State) ->
     % http://www.erlang.org/doc/man/sys.html#Mod:system_continue-3
     loop(Parent, Debug, State).
 
--spec system_terminate(term(), pid(), [sys:debug_opt()], state()) -> no_return().
+-spec system_terminate(term(), pid(), [sys:dbg_opt()], state()) -> no_return().
 %% @private
 system_terminate(Reason, _Parent, _Debug, _State) ->
     % http://www.erlang.org/doc/man/sys.html#Mod:system_terminate-4

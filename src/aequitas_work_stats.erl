@@ -138,13 +138,13 @@ write_debug(Dev, Event, Name) ->
     % called by sys:handle_debug().
     io:format(Dev, "~p event = ~p~n", [Name, Event]).
 
--spec system_continue(pid(), [sys:debug_opt()], state()) -> no_return().
+-spec system_continue(pid(), [sys:dbg_opt()], state()) -> no_return().
 %% @private
 system_continue(Parent, Debug, State) ->
     % http://www.erlang.org/doc/man/sys.html#Mod:system_continue-3
     loop(Parent, Debug, State).
 
--spec system_terminate(term(), pid(), [sys:debug_opt()], state()) -> no_return().
+-spec system_terminate(term(), pid(), [sys:dbg_opt()], state()) -> no_return().
 %% @private
 system_terminate(Reason, _Parent, _Debug, _State) ->
     % http://www.erlang.org/doc/man/sys.html#Mod:system_terminate-4
