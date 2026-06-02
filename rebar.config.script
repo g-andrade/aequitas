@@ -34,6 +34,10 @@ begin
             % Take dev helpers away as they're no longer compatible with OTP 25
             TakeOutHank(TakeOutErlFmt(TakeOutElvis(CONFIG)));
         %
+        IntRelease when IntRelease =< 26 ->
+            % -doc tags wreak havok
+            TakeOutErlFmt(CONFIG);
+        %
         29 ->
             % Remove after the issues below are resolved and fixed versions of
             % `katana_code` and `rebar3_hank` are published.
