@@ -20,6 +20,17 @@
 
 -module(aequitas).
 
+-ifdef(E48).
+-moduledoc """
+Fairness regulator for Erlang/OTP and Elixir, with optional rate limiting.
+
+`aequitas` allows fair access to limited external resources (databases, web
+services, ...) amongst distinct actors, by detecting outliers in ordinary
+workload distributions. See the [README](readme.html) for an overview,
+configuration and examples.
+""".
+-endif.
+
 %%-------------------------------------------------------------------
 %% API Function Exports
 %%-------------------------------------------------------------------
@@ -50,31 +61,34 @@
 %% API Function Definitions
 %%-------------------------------------------------------------------
 
-%% @doc Like `:async_ask/3' but with default options
-%% @see start/2
-%% @see stop/1
-%% @see reconfigure/2
+-ifdef(E48).
+-doc """
+Like `start/2` but with default options.
+
+See also `stop/1` and `reconfigure/2`.
+""".
+-endif.
 -spec start(Category) -> ok | {error, Reason}
     when Category :: term(),
          Reason :: already_started.
 start(Category) ->
     start(Category, []).
 
-%% @doc Starts handler for `Category'
-%%
-%% <ul>
-%% <li>`Category' can be any term.</li>
-%% <li>`Opts' must be a list of `aequitas_category:setting_opt()' values.</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`ok' in case of success</li>
-%% <li>`{error, Reason}' otherwise</li>
-%% </ul>
-%% @see start/1
-%% @see stop/1
-%% @see reconfigure/2
+-ifdef(E48).
+-doc """
+Starts a handler for `Category`.
+
+- `Category` can be any term.
+- `Opts` must be a list of `t:aequitas_category:setting_opt/0` values.
+
+Returns:
+
+- `ok` in case of success
+- `{error, Reason}` otherwise
+
+See also `start/1`, `stop/1` and `reconfigure/2`.
+""".
+-endif.
 -spec start(Category, Opts) -> ok | {error, Reason}
     when Category :: term(),
          Opts :: [aequitas_category:setting_opt()],
@@ -91,29 +105,33 @@ start(Category, Opts) ->
             {error, Reason}
     end.
 
-%% @doc Stops a `Category' handler
-%%
-%% <ul>
-%% <li>`Category' must correspond to a started handler</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`ok' in case of success</li>
-%% <li>`{error, Reason}' otherwise</li>
-%% </ul>
-%% @see start/1
-%% @see reconfigure/2
+-ifdef(E48).
+-doc """
+Stops a `Category` handler.
+
+- `Category` must correspond to a started handler.
+
+Returns:
+
+- `ok` in case of success
+- `{error, Reason}` otherwise
+
+See also `start/1` and `reconfigure/2`.
+""".
+-endif.
 -spec stop(Category) -> ok | {error, Reason}
     when Category :: term(),
          Reason :: not_started.
 stop(Category) ->
     aequitas_category:stop(Category).
 
-%% @doc Like `:ask/3' but with default options
-%% @see ask/3
-%% @see async_ask/3
-%% @see async_ask/2
+-ifdef(E48).
+-doc """
+Like `ask/3` but with default options.
+
+See also `async_ask/2` and `async_ask/3`.
+""".
+-endif.
 -spec ask(Category, ActorId) -> Status | {error, Reason}
     when Category :: term(),
          ActorId :: term(),
@@ -123,23 +141,23 @@ stop(Category) ->
 ask(Category, ActorId) ->
     ask(Category, ActorId, []).
 
-%% @doc Request permission to perform work, identified under `ActorId', within `Category'
-%%
-%% <ul>
-%% <li>`Category' must refer to a started category handler.</li>
-%% <li>`ActorId' can be any term.</li>
-%% <li>`Opts' must be a list of `aequitas_category:ask_opt()' values</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`accepted' if work execution was granted</li>
-%% <li>`{rejected, Reason}' if work execution was denied</li>
-%% <li>`{error, Reason}' if something went wrong</li>
-%% </ul>
-%% @see ask/2
-%% @see async_ask/3
-%% @see async_ask/2
+-ifdef(E48).
+-doc """
+Request permission to perform work, identified under `ActorId`, within `Category`.
+
+- `Category` must refer to a started category handler.
+- `ActorId` can be any term.
+- `Opts` must be a list of `t:aequitas_category:ask_opt/0` values.
+
+Returns:
+
+- `accepted` if work execution was granted
+- `{rejected, Reason}` if work execution was denied
+- `{error, Reason}` if something went wrong
+
+See also `ask/2`, `async_ask/2` and `async_ask/3`.
+""".
+-endif.
 -spec ask(Category, ActorId, Opts) -> Status | {Status, Stats} |
                                       {error, Reason}
     when Category :: term(),
@@ -152,10 +170,13 @@ ask(Category, ActorId) ->
 ask(Category, ActorId, Opts) ->
     aequitas_category:ask(Category, ActorId, Opts).
 
-%% @doc Like `:async_ask/3' but with default options
-%% @see async_ask/3
-%% @see ask/3
-%% @see ask/2
+-ifdef(E48).
+-doc """
+Like `async_ask/3` but with default options.
+
+See also `ask/2` and `ask/3`.
+""".
+-endif.
 -spec async_ask(Category, ActorId) -> {Tag, Monitor}
     when Category :: term(),
          ActorId :: term(),
@@ -164,26 +185,26 @@ ask(Category, ActorId, Opts) ->
 async_ask(Category, ActorId) ->
     async_ask(Category, ActorId, []).
 
-%% @doc Like `:ask/3' but the reply is sent asynchronously
-%%
-%% Returns a `{Tag, Monitor}' pair whose members can be used
-%% to pattern match against the reply, which will be sent as a message
-%% to the calling process in one of the following formats:
-%% <ul>
-%% <li>`{Tag, accepted}' if work execution as granted</li>
-%% <li>`{Tag, {rejected, Reason}}' if work execution was denied</li>
-%% <li>`{Tag, {accepted, Stats}}' if work execution as granted and stats requested</li>
-%% <li>`{Tag, {{rejected, Reason}, Stats}}' if work execution was denied and stats requested</li>
-%% <li>`{''`DOWN''`, Monitor, process, _Pid, _Reason}' if the handler stopped</li>
-%% </ul>
-%%
-%% In case of a successful reply, <b>don't forget to clean `Monitor' up</b>,
-%% which can be done like this:
-%%      `demonitor(Monitor, [flush])'
-%%
-%% @see async_ask/2
-%% @see ask/3
-%% @see ask/2
+-ifdef(E48).
+-doc """
+Like `ask/3` but the reply is sent asynchronously.
+
+Returns a `{Tag, Monitor}` pair whose members can be used to pattern match
+against the reply, which will be sent as a message to the calling process in
+one of the following formats:
+
+- `{Tag, accepted}` if work execution was granted
+- `{Tag, {rejected, Reason}}` if work execution was denied
+- `{Tag, {accepted, Stats}}` if work execution was granted and stats requested
+- `{Tag, {{rejected, Reason}, Stats}}` if work execution was denied and stats requested
+- `{'DOWN', Monitor, process, _Pid, _Reason}` if the handler stopped
+
+In case of a successful reply, **don't forget to clean `Monitor` up**, which
+can be done like this: `demonitor(Monitor, [flush])`.
+
+See also `ask/2`, `ask/3` and `async_ask/2`.
+""".
+-endif.
 -spec async_ask(Category, ActorId, Opts) -> {Tag, Monitor}
     when Category :: term(),
          ActorId :: term(),
@@ -193,21 +214,21 @@ async_ask(Category, ActorId) ->
 async_ask(Category, ActorId, Opts) ->
     aequitas_category:async_ask(Category, ActorId, Opts).
 
-%% @doc Tweak settings of work `Category'
-%%
-%% <ul>
-%% <li>`Category' must refer to a started category handler.</li>
-%% <li>`SettingOpts' must be a list of `aequitas_category:setting_opt()' values</li>
-%% </ul>
-%%
-%% Returns:
-%% <ul>
-%% <li>`ok' in case of success</li>
-%% <li>`{error, Reason}' otherwise</li>
-%% </ul>
-%%
-%% @see start/2
-%% @see stop/1
+-ifdef(E48).
+-doc """
+Tweak settings of work `Category`.
+
+- `Category` must refer to a started category handler.
+- `SettingOpts` must be a list of `t:aequitas_category:setting_opt/0` values.
+
+Returns:
+
+- `ok` in case of success
+- `{error, Reason}` otherwise
+
+See also `start/2` and `stop/1`.
+""".
+-endif.
 -spec reconfigure(Category, SettingOpts)
         -> ok | {error, Reason}
     when Category :: term(),

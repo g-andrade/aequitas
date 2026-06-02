@@ -20,6 +20,15 @@
 
 -module(aequitas_work_stats).
 
+-ifdef(E48).
+-moduledoc """
+Work statistics used for outlier detection.
+
+Defines the `t:t/0` statistics type returned alongside an acceptance status
+when the `return_stats` option is given to `aequitas:ask/3`.
+""".
+-endif.
+
 -include_lib("stdlib/include/ms_transform.hrl").
 
 % https://gist.github.com/marcelog/97708058cd17f86326c82970a7f81d40#file-simpleproc-erl

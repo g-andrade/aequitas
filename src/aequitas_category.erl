@@ -18,18 +18,26 @@
 %% FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 %% DEALINGS IN THE SOFTWARE.
 
-%% @reference <a target="_parent" href="https://en.wikipedia.org/wiki/Standard_score">Standard Score / Z-Score</a> (Wikpiedia)
-%% @reference <a target="_parent" href="http://www.statisticshowto.com/probability-and-statistics/hypothesis-testing/t-score-vs-z-score/">T-Score vs. Z-score</a> (statisticshowto.com)
-%% @reference <a target="_parent" href="https://www.itl.nist.gov/div898/handbook/eda/section3/eda35h.htm">Detection of Outliers</a> (Wikipedia)
-%% @reference <a target="_parent" href="https://en.wikipedia.org/wiki/Robust_measures_of_scale">Robust measures of scale</a> (Wikipedia)
-%% @reference <a target="_parent" href="https://pkghosh.wordpress.com/2015/08/25/anomaly-detection-with-robust-zscore/">Anomaly Detection with Robust Zscore</a> (pkghosh.wordpress.com)
-%% @reference <a target="_parent" href="https://colingorrie.github.io/outlier-detection.html">Three ways to detect outliers</a> (colingorrie.github.io)
-%% @reference <a target="_parent" href="https://en.wikipedia.org/wiki/Interquartile_range">Interquartile range</a> (Wikipedia)
-
 -module(aequitas_category).
 
--ifdef(HIPE_SUPPORTED).
--compile([native]).
+-ifdef(E48).
+-moduledoc """
+Per-category handler: sliding-window work tracking and outlier detection.
+
+This module backs each `aequitas` category. Its public functions are internal
+to the library; the externally relevant surface is the
+`t:setting_opt/0` and `t:ask_opt/0` types referenced by `m:aequitas`.
+
+### References
+
+- [Standard Score / Z-Score](https://en.wikipedia.org/wiki/Standard_score) (Wikipedia)
+- [T-Score vs. Z-score](http://www.statisticshowto.com/probability-and-statistics/hypothesis-testing/t-score-vs-z-score/) (statisticshowto.com)
+- [Detection of Outliers](https://www.itl.nist.gov/div898/handbook/eda/section3/eda35h.htm) (NIST)
+- [Robust measures of scale](https://en.wikipedia.org/wiki/Robust_measures_of_scale) (Wikipedia)
+- [Anomaly Detection with Robust Zscore](https://pkghosh.wordpress.com/2015/08/25/anomaly-detection-with-robust-zscore/) (pkghosh.wordpress.com)
+- [Three ways to detect outliers](https://colingorrie.github.io/outlier-detection.html) (colingorrie.github.io)
+- [Interquartile range](https://en.wikipedia.org/wiki/Interquartile_range) (Wikipedia)
+""".
 -endif.
 
 % https://gist.github.com/marcelog/97708058cd17f86326c82970a7f81d40#file-simpleproc-erl
@@ -241,7 +249,6 @@ report_work_stats(Pid, WorkStats) ->
     send_cast(Pid, {report_work_stats, WorkStats}).
 
 -ifdef(TEST).
-%% @private
 get_current_setting(Category, Key) ->
     Pid = whereis_server(Category),
     State = sys:get_state(Pid),

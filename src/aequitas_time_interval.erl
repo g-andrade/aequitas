@@ -20,6 +20,15 @@
 
 -module(aequitas_time_interval).
 
+-ifdef(E48).
+-moduledoc """
+Time interval type used in category settings.
+
+Defines the `t:t/0` time-interval type (e.g. `{seconds, 5}`) accepted by
+`m:aequitas` category settings such as `max_window_duration`.
+""".
+-endif.
+
 %%-------------------------------------------------------------------
 %% API Function Exports
 %%-------------------------------------------------------------------
